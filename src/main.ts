@@ -2,44 +2,33 @@ import { config } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import OpenAI from 'openai';
+import { getProvider } from "./providers/index.ts";
+import type { Message } from "./types.ts";
 
 // load the .env next to the code, so mypi works from any folder
 config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
 
-
-const apiKey = process.env.MODEL_API_KEY;
-if (!apiKey) {
-  throw new Error('MODEL_API_KEY is not set');
-}
-
 const {values} = parseArgs({
     options:{
         prompt: {type: "string", short:"p"},
-        model: {type: "string", default:"muse-spark-1.3-contributor"}
+        provider: {type: "string", default: "meta", short: "z"},
+        model: {type: "string"}
     }
 })
 
 if(!values.prompt){
-    console.log("no prompt sirrrrr");
+    console.log(`no prompt sirrrrr, mypi -p "prompt" -prov "meta"`);
     process.exit(1);
 }
 
-const client = new OpenAI({
-  baseURL: 'https://api.meta.ai/v1',
-  apiKey,
-});
+const provider = getProvider(values.provider);
+const model = values.model ?? provider.defaultModel;
+const messages:Message[] = [{role: "user", content: values.prompt}]
 
-const stream = await client.responses.create({
-  model: values.model,
-  input: values.prompt,
-  max_output_tokens: 1024,
-  temperature: 1,
-  stream: true
-});
-
-for await (const event of stream) {
-    if (event.type === "response.output_text.delta") {
-        process.stdout.write(event.delta);
-    } 
-
+for await(const event of provider.stream({messages,model})){
+    if(event.type==="text_delta") process.stdout.write(event.delta);
+    else {
+        const {usage, stopReason}= event.message;
+        console.log(`\n\n ${provider.name} ... ${model} ... ${usage.input} ... ${usage.output}  ... ${stopReason}`)
+    }
 }
