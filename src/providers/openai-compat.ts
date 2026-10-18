@@ -1,27 +1,50 @@
-import OpenAI from "openai";
-import type { ContentBlock, Message, Provider, StopReason, TextBlock, ToolCallBlock, Usage } from "../types.ts";
 
+import OpenAI from "openai";
+import type {
+    ContentBlock,
+    Message,
+    Provider,
+    StopReason,
+    TextBlock,
+    ToolCallBlock,
+    Usage,
+} from "../types.ts";
+
+// Convert our messages into OpenAI's format.
 function toOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
-    return messages.map((m): OpenAI.ChatCompletionMessageParam => {
-        if (m.role === "user") return { role: "user", content: m.content };
-        if (m.role === "assistant") {
-            const text = m.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("");
-            const calls = m.content.filter((b): b is ToolCallBlock => b.type === "toolCall");
+    return messages.map((message): OpenAI.ChatCompletionMessageParam => {
+        if (message.role === "user") {
+            return { role: "user", content: message.content };
+        }
+        if (message.role === "assistant") {
+            const text = message.content
+                .filter((block): block is TextBlock => block.type === "text")
+                .map((block) => block.text)
+                .join("");
+
+            const toolCalls = message.content.filter(
+                (block): block is ToolCallBlock => block.type === "toolCall"
+            );
+
             return {
                 role: "assistant",
                 content: text || null,
-                // OpenAI wants the arguments as a JSON *string*
-                tool_calls: calls.length
-                    ? calls.map((c) => ({
-                          id: c.id,
-                          type: "function" as const,
-                          function: { name: c.name, arguments: JSON.stringify(c.arguments) },
-                      }))
-                    : undefined,
+                tool_calls: toolCalls.map((tool) => ({
+                    id: tool.id,
+                    type: "function" as const,
+                    function: {
+                        name: tool.name,
+                        arguments: JSON.stringify(tool.arguments),
+                    },
+                })),
             };
         }
-        // toolResult -> its own message with role "tool"
-        return { role: "tool", tool_call_id: m.toolCallId, content: m.content };
+
+        return {
+            role: "tool",
+            tool_call_id: message.toolCallId,
+            content: message.content,
+        };
     });
 }
 
@@ -32,51 +55,96 @@ export function createOpenAICompat(
     defaultModel: string,
 ): Provider {
     const client = new OpenAI({ baseURL, apiKey });
+
     return {
         name,
         defaultModel,
+
         async *stream({ messages, model, system, tools = [] }) {
-            const stream = await client.chat.completions.create({
+            const response = await client.chat.completions.create({
                 model,
                 stream: true,
                 stream_options: { include_usage: true },
-                messages: system ? [{ role: "system", content: system }, ...toOpenAI(messages)] : toOpenAI(messages),
-                tools: tools.map((t) => ({
+                messages: [
+                    ...(system ? [{ role: "system" as const, content: system }] : []),
+                    ...toOpenAI(messages),
+                ],
+                tools: tools.map((tool) => ({
                     type: "function" as const,
-                    function: { name: t.name, description: t.description, parameters: t.parameters },
+                    function: {
+                        name: tool.name,
+                        description: tool.description,
+                        parameters: tool.parameters,
+                    },
                 })),
+                tool_choice: tools.length ? "auto" : undefined,
             });
-            let text = "";
-            const calls: { id: string; name: string; args: string }[] = [];
+
+            let fullText = "";
+            const toolCalls: { id: string; name: string; arguments: string }[] = [];
             let usage: Usage = { input: 0, output: 0 };
             let stopReason: StopReason = "stop";
 
-            for await (const chunk of stream) {
+            for await (const chunk of response) {
                 const choice = chunk.choices[0];
-                if (choice?.delta?.content) {
-                    text += choice.delta.content;
-                    yield { type: "text_delta", delta: choice.delta.content };
+                const delta = choice?.delta;
+
+                if (delta?.content) {
+                    fullText += delta.content;
+                    yield { type: "text_delta", delta: delta.content };
                 }
-                if (choice?.delta?.tool_calls) {
-                    for (const tc of choice.delta.tool_calls) {
-                        const i = tc.index ?? 0;
-                        if (!calls[i]) calls[i] = { id: "", name: "", args: "" };
-                        if (tc.id) calls[i].id = tc.id;
-                        if (tc.function?.name) calls[i].name += tc.function.name;
-                        if (tc.function?.arguments) calls[i].args += tc.function.arguments;
+
+                for (const tool of delta?.tool_calls ?? []) {
+                    const index = tool.index;
+
+                    if (!toolCalls[index]) {
+                        toolCalls[index] = { id: "", name: "", arguments: "" };
+                    }
+
+                    if (tool.id) toolCalls[index].id = tool.id;
+                    if (tool.function?.name) {
+                        toolCalls[index].name += tool.function.name;
+                    }
+                    if (tool.function?.arguments) {
+                        toolCalls[index].arguments += tool.function.arguments;
                     }
                 }
-                if (choice?.finish_reason === "tool_calls") stopReason = "toolUse";
-                else if (choice?.finish_reason === "length") stopReason = "length";
-                if (chunk.usage) usage = { input: chunk.usage.prompt_tokens, output: chunk.usage.completion_tokens };
+
+                if (choice?.finish_reason === "tool_calls") {
+                    stopReason = "toolUse";
+                } else if (choice?.finish_reason === "length") {
+                    stopReason = "length";
+                }
+
+                if (chunk.usage) {
+                    usage = {
+                        input: chunk.usage.prompt_tokens,
+                        output: chunk.usage.completion_tokens,
+                    };
+                }
             }
+
             const content: ContentBlock[] = [];
-            if (text) content.push({ type: "text", text });
-            for (const c of calls) {
-                if (!c.id && !c.name && !c.args) continue;
-                content.push({ type: "toolCall", id: c.id, name: c.name, arguments: c.args ? JSON.parse(c.args) : {} });
+
+            if (fullText) {
+                content.push({ type: "text", text: fullText });
             }
-            yield { type: "done", message: { role: "assistant", content, usage, stopReason } };
+
+            for (const tool of toolCalls) {
+                if (!tool) continue;
+
+                content.push({
+                    type: "toolCall",
+                    id: tool.id,
+                    name: tool.name,
+                    arguments: tool.arguments ? JSON.parse(tool.arguments) : {},
+                });
+            }
+
+            yield {
+                type: "done",
+                message: { role: "assistant", content, usage, stopReason },
+            };
         },
     };
 }
