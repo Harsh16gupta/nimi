@@ -23,5 +23,4 @@ export const readTool:Tool = {
             "utf-8"
         );
     }
-        
 }

@@ -5,7 +5,9 @@ import { runAgent } from "./agent.ts";
 import { getProvider } from "./providers/index.ts";
 import { bashTool } from "./tools/bash.ts";
 import { readTool } from "./tools/read.ts";
+import { writeTool } from "./tools/write.ts";
 import type { Message, Tool } from "./types.ts";
+import { editTool } from "./tools/edit.ts";
 
 // load the .env next to the code, so mypi works from any folder
 config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
@@ -34,7 +36,7 @@ const model = values.model ?? provider.defaultModel;
 // runAgent appends every reply and tool result to this same array.
 const messages:Message[] = [{role: "user", content: values.prompt}]
 // The tools the model may call. Adding a new tool = append it here.
-const tools:Tool[] = [readTool, bashTool];
+const tools:Tool[] = [readTool, bashTool, writeTool, editTool];
 
 // The whole agent loop lives in runAgent. onEvent fires for every
 // AgentEvent (text piece, tool call, tool result, done) so we can
