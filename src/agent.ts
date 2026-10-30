@@ -1,5 +1,3 @@
-// "import type" imports only the *shapes* (types), not runnable code.
-// It is erased before the program runs, so it costs nothing at runtime.
 import type {
   AssistantMessage,
   Message,
@@ -38,7 +36,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
       tools: options.tools,
     })) {
       if (event.type === "text_delta") {
-        if (options.onEvent !== undefined) {
+        if (options.onEvent !== undefined) {                             //strictly no equal
           options.onEvent({ type: "text_delta", delta: event.delta });
         }
       } else {

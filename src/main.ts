@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { runAgent } from "./agent.ts";
 import { getProvider } from "./providers/index.ts";
+import { bashTool } from "./tools/bash.ts";
 import { readTool } from "./tools/read.ts";
 import type { Message, Tool } from "./types.ts";
 
@@ -33,7 +34,7 @@ const model = values.model ?? provider.defaultModel;
 // runAgent appends every reply and tool result to this same array.
 const messages:Message[] = [{role: "user", content: values.prompt}]
 // The tools the model may call. Adding a new tool = append it here.
-const tools:Tool[] = [readTool];
+const tools:Tool[] = [readTool, bashTool];
 
 // The whole agent loop lives in runAgent. onEvent fires for every
 // AgentEvent (text piece, tool call, tool result, done) so we can
