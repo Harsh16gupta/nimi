@@ -24,7 +24,7 @@ export type AgentOptions = {
 const DEFAULT_MAX_ITERATIONS = 10;
 
 export async function runAgent(options: AgentOptions): Promise<AssistantMessage> {
-  let maxIterations = DEFAULT_MAX_ITERATIONS;
+  const maxIterations = DEFAULT_MAX_ITERATIONS;
  
   for (let round = 0; round < maxIterations; round++) {
 

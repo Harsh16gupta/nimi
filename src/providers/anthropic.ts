@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ContentBlock, Message, Provider, StopReason, Usage } from "../types.ts";
+import type { ContentBlock, Message, Provider, StopReason } from "../types.ts";
 
 function toAnthropic(message:Message[]):Anthropic.MessageParam[]{
     return message.map((m):Anthropic.MessageParam =>{

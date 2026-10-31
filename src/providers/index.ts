@@ -13,7 +13,7 @@ const providers:Record<string, ()=>Provider>={
 export function getProvider(name:string):Provider {
     const create = providers[name];
     if(!create){
-        throw new Error("gdbd")
+        throw new Error(`Unknown provider: ${name}. Available: ${Object.keys(providers).join(", ")}`)
     }
     return create();
 }
