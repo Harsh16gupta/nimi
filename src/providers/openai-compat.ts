@@ -11,7 +11,7 @@ import type {
 } from "../types.ts";
 
 // Convert our messages into OpenAI's format.
-function toOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
+export function toOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
     return messages.map((message): OpenAI.ChatCompletionMessageParam => {
         if (message.role === "user") {
             return { role: "user", content: message.content };
@@ -26,18 +26,25 @@ function toOpenAI(messages: Message[]): OpenAI.ChatCompletionMessageParam[] {
                 (block): block is ToolCallBlock => block.type === "toolCall"
             );
 
-            return {
-                role: "assistant",
-                content: text || null,
-                tool_calls: toolCalls.map((tool) => ({
-                    id: tool.id,
-                    type: "function" as const,
-                    function: {
-                        name: tool.name,
-                        arguments: JSON.stringify(tool.arguments),
-                    },
-                })),
-            };
+            // The API rejects `"tool_calls": []`, so only send the key
+            // when there is at least one call. Plain text replies are
+            // sent as content-only messages.
+            if (toolCalls.length > 0) {
+                return {
+                    role: "assistant",
+                    content: text || null,
+                    tool_calls: toolCalls.map((tool) => ({
+                        id: tool.id,
+                        type: "function" as const,
+                        function: {
+                            name: tool.name,
+                            arguments: JSON.stringify(tool.arguments),
+                        },
+                    })),
+                };
+            }
+
+            return { role: "assistant", content: text };
         }
 
         return {

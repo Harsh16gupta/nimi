@@ -18,6 +18,8 @@ export type AgentOptions = {
   model: string;
   messages: Message[];
   tools: Tool[];
+  system?: string;
+  signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
 };
 
@@ -27,6 +29,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
   const maxIterations = DEFAULT_MAX_ITERATIONS;
  
   for (let round = 0; round < maxIterations; round++) {
+    options.signal?.throwIfAborted();
 
     let reply: AssistantMessage | undefined = undefined;
 
@@ -34,7 +37,9 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
       messages: options.messages,
       model: options.model,
       tools: options.tools,
+      system: options.system,
     })) {
+      options.signal?.throwIfAborted();
       if (event.type === "text_delta") {
         if (options.onEvent !== undefined) {                             //strictly no equal
           options.onEvent({ type: "text_delta", delta: event.delta });
@@ -77,6 +82,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
     // --- Step 3: run each requested tool, save each result. ---
 
     for (const call of toolCalls) {
+      options.signal?.throwIfAborted();
       // Tell the caller a tool is starting (used for the "[tool]" log line).
       if (options.onEvent !== undefined) {
         options.onEvent({ type: "tool_call", block: call });
