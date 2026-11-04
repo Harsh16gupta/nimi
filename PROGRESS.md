@@ -14,3 +14,8 @@
 - What I learned: agent couldn't see repo state without `bash git ...` (shell-injection risk). `spawn("git", argsArray)` avoids shell; non-zero exit throws so loop marks `isError`.
 - What changed: new `src/tools/git.ts` with `runGit` helper (30s kill, stderr merged, `truncateOutput`) + `git_status`/`git_log`/`git_diff`, all `readOnly:true`; registered in `src/tools/index.ts`. No type change.
 - How to verify: `npx tsc --noEmit` OK; smoke in repo showed 10 tools, status/log/diff output correct; `--help` still works.
+
+## Step 4: Permissions gate (y/a/n/always + --yolo)
+- What I learned: writes/commands need asking; observes don't. Gate returns deny as error result so model adapts instead of crash. `always` set remembers per-tool choice.
+- What changed: new `src/permissions.ts` (`CanUseTool`, `allowAll`, `createPromptPermission`); `agent.ts` checks `readOnly!==true` then gate; `arg.ts` adds `--yolo`; `main.tsx` print mode wires prompt/`allowAll`. TUI dialog deferred to Step 10.
+- How to verify: `npx tsc --noEmit` OK; fake-provider smoke: write deny -> `isError=true`, ls bypass `gateCalls=0`; `--help` shows `--yolo`.

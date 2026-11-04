@@ -1,8 +1,10 @@
 import { config } from "dotenv";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { runAgent } from "./agent.ts";
 import { parseArgs, printHelp, printVersion } from "./cli/arg.ts";
 import { buildSystemPrompt } from "./config/system-prompt.ts";
+import { allowAll, createPromptPermission } from "./permissions.ts";
 import { getProvider } from "./providers/index.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
 import type { Message } from "./types.ts";
@@ -41,13 +43,19 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
     process.exit(1);
   }
   const messages: Message[] = [{ role: "user", content: args.prompt }];
-  await runAgent({
-    provider,
-    model,
-    system,
-    messages,
-    tools: ALL_TOOLS,
-    onEvent: (event) => {
+  // --yolo skips prompts; otherwise ask y/a/n for each write tool.
+  // TUI dialog comes in Step 10, so TUI still auto-allows for now.
+  const rl = args.yolo ? null : createInterface({ input: process.stdin, output: process.stdout });
+  const canUseTool = args.yolo ? allowAll() : createPromptPermission(rl!);
+  try {
+    await runAgent({
+      provider,
+      model,
+      system,
+      messages,
+      tools: ALL_TOOLS,
+      canUseTool,
+      onEvent: (event) => {
       if (event.type === "text_delta") process.stdout.write(event.delta);
       else if (event.type === "tool_call") {
         console.log(`\n\n[tool] ${event.block.name} ${JSON.stringify(event.block.arguments)}`);
@@ -56,7 +64,10 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
         console.log(`[result] ${event.toolName}${event.isError ? " (error)" : ""}:\n${preview}`);
       }
     },
-  });
+    });
+  } finally {
+    rl?.close();
+  }
   process.exit(0);
 }
 

@@ -5,6 +5,7 @@ import type {
   Tool,
   ToolCallBlock,
 } from "./types.ts";
+import type { CanUseTool } from "./permissions.ts";
 
 
 export type AgentEvent =
@@ -21,6 +22,7 @@ export type AgentOptions = {
   system?: string;
   signal?: AbortSignal;
   onEvent?: (event: AgentEvent) => void;
+  canUseTool?: CanUseTool;
 };
 
 const DEFAULT_MAX_ITERATIONS = 10;
@@ -111,6 +113,27 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
           options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: content, isError: true });
         }
         continue; // skip to the next tool call
+      }
+
+      // Read-only tools observe only, so they skip the prompt.
+      // Writes/commands ask the gate; a denial becomes an error result
+      // so the model can adapt instead of the run dying.
+      if (toolToRun.readOnly !== true && options.canUseTool !== undefined) {
+        const decision = await options.canUseTool(call.name, call.arguments);
+        if (decision.behavior === "deny") {
+          const content = decision.message;
+          options.messages.push({
+            role: "toolResult",
+            toolCallId: call.id,
+            toolName: call.name,
+            content: content,
+            isError: true,
+          });
+          if (options.onEvent !== undefined) {
+            options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: content, isError: true });
+          }
+          continue;
+        }
       }
 
       // "try/catch" handles a tool that throws (file missing, bad args...).

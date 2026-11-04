@@ -2,6 +2,7 @@ export interface CliArgs {
 	prompt?: string; // -p / --prompt: the text to send to the model
 	provider: string; // -z / --provider: which provider to use
 	model?: string; // --model: override the provider's default model
+	yolo: boolean; // --yolo: run all tools without asking
 	version: boolean; // -v / --version
 	help: boolean; // -h / --help
 }
@@ -11,6 +12,7 @@ const DEFAULT_PROVIDER = "meta";
 export function parseArgs(argv: string[]): CliArgs {
 	const args: CliArgs = {
 		provider: DEFAULT_PROVIDER,
+		yolo: false,
 		version: false,
 		help: false,
 	};
@@ -46,6 +48,9 @@ export function parseArgs(argv: string[]): CliArgs {
 				break;
 			case "--model":
 				args.model = value();
+				break;
+			case "--yolo":
+				args.yolo = true;
 				break;
 			case "--version":
 			case "-v":
@@ -86,6 +91,7 @@ OPTIONS
   -p, --prompt <text>    The prompt to send to the model
   -z, --provider <name>  Provider to use (default: ${DEFAULT_PROVIDER})
       --model <id>       Model ID (defaults to the provider's model)
+      --yolo             Run all tools without asking
   -v, --version          Show version
   -h, --help             Show this help
 
