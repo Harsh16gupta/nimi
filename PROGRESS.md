@@ -9,3 +9,8 @@
 - What I learned: one big `read`/`grep` can dump 100k chars into the next prompt and blow context; one hanging `bash` stalls the loop. Caps + timeout bound cost. `readOnly` marks safe tools so Step 4 permissions can auto-allow them.
 - What changed: `src/types.ts` added `readOnly?: boolean` (additive only); new `src/tools/output.ts` `truncateOutput(20000)`; `read`+`bash` wrap output, `bash` gets 30s `timeout`; `read/ls/find/grep` set `readOnly:true`.
 - How to verify: `npx tsc --noEmit` OK; smoke showed `read=true,write=false,edit=false,bash=false,ls=true,find=true,grep=true`, 20001 chars -> 20027 with marker, `bash echo hi` OK; `--help` still works.
+
+## Step 3: Git read-only (status/log/diff via spawn)
+- What I learned: agent couldn't see repo state without `bash git ...` (shell-injection risk). `spawn("git", argsArray)` avoids shell; non-zero exit throws so loop marks `isError`.
+- What changed: new `src/tools/git.ts` with `runGit` helper (30s kill, stderr merged, `truncateOutput`) + `git_status`/`git_log`/`git_diff`, all `readOnly:true`; registered in `src/tools/index.ts`. No type change.
+- How to verify: `npx tsc --noEmit` OK; smoke in repo showed 10 tools, status/log/diff output correct; `--help` still works.
