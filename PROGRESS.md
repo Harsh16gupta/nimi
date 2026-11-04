@@ -23,3 +23,8 @@
 ## Step 4b: TUI permission dialog (y/a/n in Ink)
 - What changed: `App.tsx` holds `pending` + `alwaysAllowed`, `canUseTool` parks a promise, `useInput` resolves it on y/a/n/esc; input box locked while pending. `main.tsx` passes `yolo`.
 - How to verify: `npx tsc --noEmit` OK; manual TUI run asks on `write`/`bash`, `read`/`ls` pass through.
+
+## Step 5: Loop as generator (decide-by-blocks, denied event)
+- What I learned: callback `onEvent` forced UIs to share one shape and hid denials; yielding lets print/TUI consume the same stream. Stop-reason lies (Gemini `end_turn` with tools), blocks don't.
+- What changed: `runAgent` is `async *` yielding `agent_start/text_delta/tool_start/tool_end/denied/turn_end/agent_end`; `maxTurns` 10->20; `main.tsx` + `App.tsx` use `for await`. Deny yields `denied` then error `tool_end`.
+- How to verify: `npx tsc --noEmit` OK; fake-provider smoke: stop+toolCall still runs tool, deny emits `denied+tool_end`; `--help` works.

@@ -189,7 +189,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
       abortRef.current = controller;
 
       try {
-        await runAgent({
+        for await (const event of runAgent({
           provider,
           model,
           system,
@@ -197,32 +197,33 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           messages: messagesRef.current,
           signal: controller.signal,
           canUseTool,
-          onEvent: (event) => {
-            if (event.type === "text_delta") {
-              appendText(event.delta);
-            } else if (event.type === "tool_call") {
-              textIdRef.current = null;
-              const id = nextId();
-              const label = shortLabel(event.block.name, event.block.arguments);
-              setRows((prev) => [
-                ...prev,
-                { kind: "tool", id, toolCallId: event.block.id, label, status: "running", summary: "" },
-              ]);
-            } else if (event.type === "tool_result") {
-              textIdRef.current = null;
-              const summary = resultSummary(event.toolName, event.content, event.isError);
-              setRows((prev) =>
-                prev.map((r) =>
-                  r.kind === "tool" && r.toolCallId === event.toolCallId
-                    ? { ...r, status: event.isError ? "error" : "ok", summary }
-                    : r,
-                ),
-              );
-            } else if (event.type === "done") {
-              textIdRef.current = null;
-            }
-          },
-        });
+        })) {
+          if (event.type === "text_delta") {
+            appendText(event.delta);
+          } else if (event.type === "tool_start") {
+            textIdRef.current = null;
+            const id = nextId();
+            const label = shortLabel(event.name, event.input);
+            setRows((prev) => [
+              ...prev,
+              { kind: "tool", id, toolCallId: event.id, label, status: "running", summary: "" },
+            ]);
+          } else if (event.type === "denied") {
+            textIdRef.current = null;
+          } else if (event.type === "tool_end") {
+            textIdRef.current = null;
+            const summary = resultSummary(event.name, event.result, event.isError);
+            setRows((prev) =>
+              prev.map((r) =>
+                r.kind === "tool" && r.toolCallId === event.id
+                  ? { ...r, status: event.isError ? "error" : "ok", summary }
+                  : r,
+              ),
+            );
+          } else if (event.type === "turn_end" || event.type === "agent_end") {
+            textIdRef.current = null;
+          }
+        }
       } catch (err) {
         textIdRef.current = null;
         if (err instanceof Error && err.name === "AbortError") {

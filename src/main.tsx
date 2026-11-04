@@ -47,23 +47,24 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
   const rl = args.yolo ? null : createInterface({ input: process.stdin, output: process.stdout });
   const canUseTool = args.yolo ? allowAll() : createPromptPermission(rl!);
   try {
-    await runAgent({
+    for await (const event of runAgent({
       provider,
       model,
       system,
       messages,
       tools: ALL_TOOLS,
       canUseTool,
-      onEvent: (event) => {
+    })) {
       if (event.type === "text_delta") process.stdout.write(event.delta);
-      else if (event.type === "tool_call") {
-        console.log(`\n\n[tool] ${event.block.name} ${JSON.stringify(event.block.arguments)}`);
-      } else if (event.type === "tool_result") {
-        const preview = event.content.length > 500 ? event.content.slice(0, 500) + "..." : event.content;
-        console.log(`[result] ${event.toolName}${event.isError ? " (error)" : ""}:\n${preview}`);
+      else if (event.type === "tool_start") {
+        console.log(`\n\n[tool] ${event.name} ${JSON.stringify(event.input)}`);
+      } else if (event.type === "denied") {
+        console.log(`\n[denied] ${event.name}: ${event.reason}`);
+      } else if (event.type === "tool_end") {
+        const preview = event.result.length > 500 ? event.result.slice(0, 500) + "..." : event.result;
+        console.log(`[result] ${event.name}${event.isError ? " (error)" : ""}:\n${preview}`);
       }
-    },
-    });
+    }
   } finally {
     rl?.close();
   }

@@ -9,10 +9,13 @@ import type { CanUseTool } from "./permissions.ts";
 
 
 export type AgentEvent =
+  | { type: "agent_start" }
   | { type: "text_delta"; delta: string }
-  | { type: "tool_call"; block: ToolCallBlock }
-  | { type: "tool_result"; toolCallId: string; toolName: string; content: string; isError: boolean }
-  | { type: "done"; message: AssistantMessage };
+  | { type: "tool_start"; id: string; name: string; input: Record<string, unknown> }
+  | { type: "tool_end"; id: string; name: string; result: string; isError: boolean }
+  | { type: "denied"; id: string; name: string; reason: string }
+  | { type: "turn_end" }
+  | { type: "agent_end"; message: AssistantMessage };
 
 export type AgentOptions = {
   provider: Provider;
@@ -21,16 +24,17 @@ export type AgentOptions = {
   tools: Tool[];
   system?: string;
   signal?: AbortSignal;
-  onEvent?: (event: AgentEvent) => void;
+  maxTurns?: number;
   canUseTool?: CanUseTool;
 };
 
-const DEFAULT_MAX_ITERATIONS = 10;
+const DEFAULT_MAX_TURNS = 20;
 
-export async function runAgent(options: AgentOptions): Promise<AssistantMessage> {
-  const maxIterations = DEFAULT_MAX_ITERATIONS;
- 
-  for (let round = 0; round < maxIterations; round++) {
+export async function* runAgent(options: AgentOptions): AsyncGenerator<AgentEvent> {
+  const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
+  yield { type: "agent_start" };
+
+  for (let round = 0; round < maxTurns; round++) {
     options.signal?.throwIfAborted();
 
     let reply: AssistantMessage | undefined = undefined;
@@ -43,9 +47,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
     })) {
       options.signal?.throwIfAborted();
       if (event.type === "text_delta") {
-        if (options.onEvent !== undefined) {                             //strictly no equal
-          options.onEvent({ type: "text_delta", delta: event.delta });
-        }
+        yield { type: "text_delta", delta: event.delta };
       } else {
         reply = event.message;
       }
@@ -71,24 +73,22 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
       }
     }
 
-    // No tool calls means the model gave a final text answer: tell the
-    // caller and return it. ("toolUse" with zero calls would loop forever,
-    // so treat it as done too.)
-    if (reply.stopReason !== "toolUse" || toolCalls.length === 0) {
-      if (options.onEvent !== undefined) {
-        options.onEvent({ type: "done", message: reply });
-      }
-      return reply;
+    // No tool calls means the model gave a final text answer.
+    // Decide by blocks, not stopReason: some providers report end_turn
+    // even when they called tools, so blocks are the source of truth.
+    if (toolCalls.length === 0) {
+      yield { type: "turn_end" };
+      yield { type: "agent_end", message: reply };
+      return;
     }
+    yield { type: "turn_end" };
 
     // --- Step 3: run each requested tool, save each result. ---
 
     for (const call of toolCalls) {
       options.signal?.throwIfAborted();
       // Tell the caller a tool is starting (used for the "[tool]" log line).
-      if (options.onEvent !== undefined) {
-        options.onEvent({ type: "tool_call", block: call });
-      }
+      yield { type: "tool_start", id: call.id, name: call.name, input: call.arguments };
 
       // Find the tool by name with a plain loop.
       let toolToRun: Tool | undefined = undefined;
@@ -109,9 +109,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
           content: content,
           isError: true,
         });
-        if (options.onEvent !== undefined) {
-          options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: content, isError: true });
-        }
+        yield { type: "tool_end", id: call.id, name: call.name, result: content, isError: true };
         continue; // skip to the next tool call
       }
 
@@ -129,9 +127,8 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
             content: content,
             isError: true,
           });
-          if (options.onEvent !== undefined) {
-            options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: content, isError: true });
-          }
+          yield { type: "denied", id: call.id, name: call.name, reason: content };
+          yield { type: "tool_end", id: call.id, name: call.name, result: content, isError: true };
           continue;
         }
       }
@@ -148,9 +145,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
           content: output,
           isError: false,
         });
-        if (options.onEvent !== undefined) {
-          options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: output, isError: false });
-        }
+        yield { type: "tool_end", id: call.id, name: call.name, result: output, isError: false };
       } catch (error) {
         // "error" is typed "unknown": it could be anything, not just Error.
         // So we check before reading .message, else TypeScript complains.
@@ -167,9 +162,7 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
           content: message,
           isError: true,
         });
-        if (options.onEvent !== undefined) {
-          options.onEvent({ type: "tool_result", toolCallId: call.id, toolName: call.name, content: message, isError: true });
-        }
+        yield { type: "tool_end", id: call.id, name: call.name, result: message, isError: true };
       }
     }
 
@@ -179,5 +172,5 @@ export async function runAgent(options: AgentOptions): Promise<AssistantMessage>
 
   // Only reachable if EVERY round asked for tools. Fail instead of
   // looping forever (and burning API money).
-  throw new Error("Agent exceeded max iterations (" + maxIterations + ")");
+  throw new Error("Agent exceeded max turns (" + maxTurns + ")");
 }
