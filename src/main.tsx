@@ -44,7 +44,6 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
   }
   const messages: Message[] = [{ role: "user", content: args.prompt }];
   // --yolo skips prompts; otherwise ask y/a/n for each write tool.
-  // TUI dialog comes in Step 10, so TUI still auto-allows for now.
   const rl = args.yolo ? null : createInterface({ input: process.stdin, output: process.stdout });
   const canUseTool = args.yolo ? allowAll() : createPromptPermission(rl!);
   try {
@@ -76,5 +75,5 @@ const { render } = await import("ink");
 const { default: App } = await import("./tui/App.tsx");
 
 render(
-  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} />,
+  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} />,
 );

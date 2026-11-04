@@ -19,3 +19,7 @@
 - What I learned: writes/commands need asking; observes don't. Gate returns deny as error result so model adapts instead of crash. `always` set remembers per-tool choice.
 - What changed: new `src/permissions.ts` (`CanUseTool`, `allowAll`, `createPromptPermission`); `agent.ts` checks `readOnly!==true` then gate; `arg.ts` adds `--yolo`; `main.tsx` print mode wires prompt/`allowAll`. TUI dialog deferred to Step 10.
 - How to verify: `npx tsc --noEmit` OK; fake-provider smoke: write deny -> `isError=true`, ls bypass `gateCalls=0`; `--help` shows `--yolo`.
+
+## Step 4b: TUI permission dialog (y/a/n in Ink)
+- What changed: `App.tsx` holds `pending` + `alwaysAllowed`, `canUseTool` parks a promise, `useInput` resolves it on y/a/n/esc; input box locked while pending. `main.tsx` passes `yolo`.
+- How to verify: `npx tsc --noEmit` OK; manual TUI run asks on `write`/`bash`, `read`/`ls` pass through.

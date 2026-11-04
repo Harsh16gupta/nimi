@@ -26,6 +26,7 @@ type AppProps = {
   system: string;
   tools: Tool[];
   initialPrompt?: string;
+  yolo?: boolean;
 };
 
 const DIVIDER_MAX = 80;
@@ -93,13 +94,15 @@ function ToolRow({ row }: { row: Extract<Row, { kind: "tool" }> }) {
   );
 }
 
-export default function App({ provider, model, system, tools, initialPrompt }: AppProps) {
+export default function App({ provider, model, system, tools, initialPrompt, yolo }: AppProps) {
   const { exit } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState(0);
+  // Pending write-tool approval: set by canUseTool, resolved by y/a/n keys.
+  const [pending, setPending] = useState<{ name: string; input: Record<string, unknown>; resolve: (v: "yes" | "always" | "no") => void } | null>(null);
 
   const idRef = useRef(1);
   const messagesRef = useRef<Message[]>([]);
@@ -107,6 +110,8 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
   const workingRef = useRef(false);
   const textIdRef = useRef<number | null>(null);
   const startedRef = useRef(false);
+  // Tools answered "always" skip future prompts in this session.
+  const alwaysAllowed = useRef(new Set<string>());
 
   const nextId = () => idRef.current++;
 
@@ -120,6 +125,24 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
       setRows((prev) => prev.map((r) => (r.kind === "text" && r.id === id ? { ...r, text: r.text + delta } : r)));
     }
   }, []);
+
+  // Gate called by the agent before write tools. Read-only tools never reach here.
+  const canUseTool = useCallback(
+    async (name: string, input: Record<string, unknown>) => {
+      if (yolo || alwaysAllowed.current.has(name)) return { behavior: "allow" as const };
+      const answer = await new Promise<"yes" | "always" | "no">((resolve) => {
+        setPending({ name, input, resolve });
+      });
+      setPending(null);
+      if (answer === "always") {
+        alwaysAllowed.current.add(name);
+        return { behavior: "allow" as const };
+      }
+      if (answer === "yes") return { behavior: "allow" as const };
+      return { behavior: "deny" as const, message: `User denied ${name}. Do not retry; ask what to do instead.` };
+    },
+    [yolo],
+  );
 
   const submitPrompt = useCallback(
     async (prompt: string) => {
@@ -173,6 +196,7 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
           tools,
           messages: messagesRef.current,
           signal: controller.signal,
+          canUseTool,
           onEvent: (event) => {
             if (event.type === "text_delta") {
               appendText(event.delta);
@@ -213,10 +237,18 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
         setWorking(false);
       }
     },
-    [appendText, exit, model, provider, system, tools],
+    [appendText, canUseTool, exit, model, provider, system, tools],
   );
 
-  useInput((_, key) => {
+  useInput((input, key) => {
+    // Permission dialog owns the keyboard while it is up.
+    if (pending) {
+      const ch = input.toLowerCase();
+      if (ch === "y") pending.resolve("yes");
+      else if (ch === "a") pending.resolve("always");
+      else if (ch === "n" || key.escape) pending.resolve("no");
+      return;
+    }
     if (key.escape && workingRef.current) {
       abortRef.current?.abort();
     }
@@ -248,6 +280,12 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
         {(row) => renderRow(row)}
       </Static>
       {live && renderRow(live)}
+      {pending && (
+        <Box marginTop={1} flexDirection="column">
+          <Text color="yellow">Permission needed: {shortLabel(pending.name, pending.input)}</Text>
+          <Text dimColor>y = yes · a = always · n = no (esc)</Text>
+        </Box>
+      )}
       {error && (
         <Box marginTop={1}>
           <Text color="red">✕ {error}</Text>
@@ -259,10 +297,11 @@ export default function App({ provider, model, system, tools, initialPrompt }: A
           value={draft}
           onChange={setDraft}
           onSubmit={(value) => {
+            if (pending) return;
             setDraft("");
             void submitPrompt(value);
           }}
-          placeholder={working ? "working…" : "Ask nimi…"}
+          placeholder={pending ? "answer y/a/n…" : working ? "working…" : "Ask nimi…"}
         />
       </Box>
       <Box>
