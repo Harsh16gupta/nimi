@@ -17,6 +17,7 @@ function globToRegExp(glob: string): RegExp {
 export const findTool: Tool = {
     name: "find",
     description: "Find files by glob pattern, e.g. *.ts",
+    readOnly: true,
     parameters: {
         type: "object",
         properties: {

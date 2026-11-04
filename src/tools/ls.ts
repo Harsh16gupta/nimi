@@ -5,6 +5,7 @@ import type { Tool } from "../types.ts";
 export const lsTool: Tool = {
     name: "ls",
     description: "List files in a directory with types and sizes",
+    readOnly: true,
     parameters: {
         type: "object",
         properties: { path: { type: "string", description: "Dir to list (default: .)" } },

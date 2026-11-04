@@ -2,11 +2,13 @@
 import { readFile } from "node:fs/promises";
 import type { Tool } from "../types.ts";
 import { resolve } from "node:path";
+import { truncateOutput } from "./output.ts";
 
 
 export const readTool:Tool = {
     name: "read",
     description: "Read a text file and return its contents",
+    readOnly: true,
     parameters: {
         type: "object",
         properties: {
@@ -18,9 +20,10 @@ export const readTool:Tool = {
         required: ["path"]
     },
     async execute(args){
-        return readFile(
+        const text = await readFile(
             resolve(process.cwd(), String(args.path)),
             "utf-8"
         );
+        return truncateOutput(text);
     }
 }

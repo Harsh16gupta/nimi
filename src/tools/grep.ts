@@ -18,6 +18,7 @@ function globToRegExp(glob: string): RegExp {
 export const grepTool: Tool = {
     name: "grep",
     description: "Search file contents with a regex, returns file:line matches",
+    readOnly: true,
     parameters: {
         type: "object",
         properties: {
