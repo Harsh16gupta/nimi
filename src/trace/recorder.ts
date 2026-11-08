@@ -20,6 +20,9 @@ export type TraceHeaderInfo = {
   model: string;
   prompt: string;
   argv: string[];
+  // Tool catalog so the viewer knows which tools are gated (readOnly)
+  // without duplicating src knowledge. Optional to keep callers small.
+  tools?: { name: string; readOnly?: boolean }[];
 };
 
 export type TraceRecorder = {
@@ -49,6 +52,7 @@ export function createTraceRecorder(path: string, info: TraceHeaderInfo): TraceR
       prompt: info.prompt,
       started_at: new Date().toISOString(),
       argv: info.argv,
+      tools: info.tools ?? [],
     }) + "\n",
   );
 

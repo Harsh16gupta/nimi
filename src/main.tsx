@@ -96,6 +96,7 @@ if (!args.classic && (args.print || !process.stdin.isTTY || !process.stdout.isTT
         model,
         prompt: args.prompt,
         argv: process.argv.slice(2),
+        tools: ALL_TOOLS.map((t) => ({ name: t.name, readOnly: t.readOnly })),
       })
     : null;
   // --yolo skips prompts; otherwise ask y/a/n for each write tool.
@@ -156,7 +157,7 @@ if (args.session) {
 
 if (args.classic) {
   const { runClassic } = await import("./modes/classic.ts");
-  await runClassic({ provider, model, system, tools: ALL_TOOLS, sessionId: tuiSessionId, initialMessages: tuiMessages, yolo: args.yolo, contextLimit: args.contextLimit });
+  await runClassic({ provider, model, system, tools: ALL_TOOLS, sessionId: tuiSessionId, initialMessages: tuiMessages, yolo: args.yolo, contextLimit: args.contextLimit, tracePath: args.trace });
   process.exit(0);
 }
 

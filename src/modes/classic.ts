@@ -6,6 +6,8 @@ import { MODELS, getModelInfo } from "../providers/models.ts";
 import { allowAll, createPromptPermission } from "../permissions.ts";
 import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import { ALL_TOOLS } from "../tools/index.ts";
+import { createTraceRecorder } from "../trace/recorder.ts";
+import type { TraceRecorder } from "../trace/recorder.ts";
 import { HELP_TEXT, parseBare, parseSlash } from "../tui/slash.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 
@@ -18,6 +20,7 @@ export type ClassicOptions = {
     initialMessages: Message[];
     yolo: boolean;
     contextLimit?: number;
+    tracePath?: string; // --trace: JSONL showcase trace across all turns
 };
 
 // Plain readline loop for when Ink can't run. Same generator, same
@@ -29,6 +32,9 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
     let saved = messages.length;
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     const canUseTool = opts.yolo ? allowAll() : createPromptPermission(rl);
+    // One trace file spans the whole REPL (indices continue across turns);
+    // created on the first real prompt so the header names the task.
+    let trace: TraceRecorder | null = null;
     const ask = (q: string): Promise<string> => new Promise((resolve) => rl.question(q, resolve));
     console.log(`nimi ${model} · session ${opts.sessionId.slice(-6)} · /help for commands`);
     if (messages.length > 0) console.log(`Resumed — ${messages.length} messages restored.`);
@@ -84,7 +90,18 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
             continue;
         }
         messages.push({ role: "user", content: line });
+        if (opts.tracePath && !trace) {
+            trace = createTraceRecorder(opts.tracePath, {
+                session: opts.sessionId,
+                provider: provider.name,
+                model,
+                prompt: line,
+                argv: process.argv.slice(2),
+                tools: opts.tools.map((t) => ({ name: t.name, readOnly: t.readOnly })),
+            });
+        }
         for await (const event of runAgent({ provider, model, system: opts.system, tools: opts.tools, messages, contextLimit: opts.contextLimit, canUseTool })) {
+            trace?.record(event, messages);
             if (event.type === "text_delta") process.stdout.write(event.delta);
             else if (event.type === "tool_start") console.log(`\n[tool] ${event.name} ${JSON.stringify(event.input)}`);
             else if (event.type === "denied") console.log(`\n[denied] ${event.name}: ${event.reason}`);
@@ -97,5 +114,7 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
         const fresh = messages.slice(saved);
         if (fresh.length > 0) { saved = messages.length; await appendMessages(opts.sessionId, fresh); }
     }
+    // Seal the trace on /quit: the end line carries final totals.
+    trace?.finish(messages);
     rl.close();
 }
