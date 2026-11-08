@@ -125,7 +125,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const [activeProvider, setActiveProvider] = useState(provider);
   const [activeModel, setActiveModel] = useState(model);
 
-  const nextId = () => idRef.current++;
+  const nextId = useCallback(() => idRef.current++, []);
 
   const appendText = useCallback((delta: string) => {
     const id = textIdRef.current;
@@ -136,7 +136,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
     } else {
       setRows((prev) => prev.map((r) => (r.kind === "text" && r.id === id ? { ...r, text: r.text + delta } : r)));
     }
-  }, []);
+  }, [nextId]);
 
   // Gate called by the agent before write tools. Read-only tools never reach here.
   const canUseTool = useCallback(
@@ -350,7 +350,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         }
       }
     },
-    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, nextId, sessionId, system, tools],
   );
 
   useInput((input, key) => {

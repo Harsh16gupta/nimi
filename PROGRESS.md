@@ -73,3 +73,8 @@
 - What I learned: hardcoding `meta` meant every other provider needed a flag; layered files let machine and repo defaults stick while env/flags override per run.
 - What changed: new `src/config/settings.ts` (`~/.nimi` < `.nimi` < `NIMI_PROVIDER/MODEL`, missing/broken file = `{}`); `CliArgs.provider` optional with default resolved in `main.tsx`; `+= --print` (forces one-shot even in TTY); session records use resolved provider name. `--classic/--context-limit` deferred to their consumer steps.
 - How to verify: `npx tsc --noEmit` OK; empty args parse, settings load, `NIMI_PROVIDER` overrides; `--help` shows `--print`; `--list-sessions` works.
+
+## Quality: Biome lint clean, Vitest tools offline green
+- What I learned: full-tree reformat (25 files) destroys history readability — scoped Biome to lint only, formatter off; the only 2 errors were real (`nextId` recreated per render, flagged by exhaustive-deps).
+- What changed: `biome.json` (lint recommended, no format), `App.nextId` wrapped in `useCallback([])` + deps, `npm run check` (lint + tsc), `npm run test:tools`, `test/tools.test.ts` (7 tests, temp-dir, no keys).
+- How to verify: `npm run check` exit 0 (warnings/infos accepted, 0 errors); `test:tools` 7/7 green.
