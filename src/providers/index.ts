@@ -25,5 +25,3 @@ export function getProvider(name:string):Provider {
     }
     return create();
 }
-
-export { MODELS, getModelInfo } from "./models.ts";
