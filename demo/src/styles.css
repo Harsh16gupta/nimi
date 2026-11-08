@@ -1,4 +1,131 @@
-/* Scaffold placeholder: full light-first theme lands with the App. */
+/* Original light-first theme: paper background, teal/green accent,
+   rounded cards, monospace payloads. Nothing borrowed. */
+:root {
+  --bg: #f6faf8;
+  --card: #ffffff;
+  --ink: #17322c;
+  --muted: #5d746d;
+  --line: #dfe9e5;
+  --teal: #0e7c6b;
+  --green: #16a34a;
+  --amber: #b45309;
+  --red: #b91c1c;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 body {
-  font-family: system-ui, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.top {
+  padding: 16px 20px 8px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.top h1 { margin: 0 0 4px; font-size: 22px; }
+.top p { margin: 0; color: var(--muted); font-size: 14px; }
+.top code { font-family: var(--mono); font-size: 12px; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.controls button, .controls select, .controls input[type="search"] {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+}
+.controls button { cursor: pointer; }
+.controls button[aria-pressed="true"] {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.controls .pos { margin-left: auto; color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+.layout {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 340px;
+  gap: 12px;
+  padding: 8px 20px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 6px;
+}
+.turn-head h2 { margin: 0; font-size: 15px; }
+.spark { display: inline-flex; gap: 2px; align-items: flex-end; }
+.spark i { width: 6px; background: var(--teal); border-radius: 2px; opacity: 0.75; }
+
+.step { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 6px 0; }
+.step.tool { border-color: var(--teal); }
+.step.result { border-color: var(--green); }
+.step.result.err { border-color: var(--red); }
+.step.denied, .step.note { border-color: var(--amber); }
+.step .kind { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.step p { margin: 2px 0; }
+.step pre, .term {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: #f0f5f3;
+  border-radius: 8px;
+  padding: 8px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+details.payload summary { cursor: pointer; color: var(--teal); font-size: 13px; }
+
+.rail {
+  position: sticky;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+  padding: 8px 0;
+}
+.tick { width: 14px; height: 8px; border-radius: 3px; background: var(--line); border: none; padding: 0; cursor: pointer; }
+.tick.text { background: #9db8b0; }
+.tick.tool { background: var(--teal); }
+.tick.result { background: var(--green); }
+.tick.bad { background: var(--red); }
+.tick.mark { background: var(--amber); }
+.tick.now { outline: 2px solid var(--ink); }
+.tick.turn { width: 22px; height: 3px; background: var(--ink); }
+
+.tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.tabs button { font-size: 12px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--ink); color: #fff; }
+.copy { float: right; font-size: 12px; }
+.kv { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .rail { position: static; flex-direction: row; flex-wrap: wrap; }
 }
