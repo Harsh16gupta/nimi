@@ -84,6 +84,11 @@
 - What changed: new `src/trace/recorder.ts` (`createTraceRecorder` header/event/snapshot/end JSONL lines, sync appends, `withTrace` tee wrapper that yields events through unchanged and seals the file in `finally`); `arg.ts += --trace <path>`; `main.tsx` print mode wraps `runAgent` only when the flag is set. No type-shape change (additive `trace?` only).
 - How to verify: `npm run check` 0 errors; `--help` shows the flag; offline fake-provider smoke (2 turns, 1 tool): 7 events tee'd through, sequential `i`, 3 snapshots (turn_end×2 + agent_end), `end{turns:2,tools:1}`; without the flag the loop is untouched.
 
+## Showcase steps 2–11: classic trace + viewer site (demo/)
+- What I learned: the viewer must never duplicate agent knowledge — the header now ships the tool catalog (`tools:[{name,readOnly}]`), so gating badges and deny targeting derive from the trace; and nimi yields `turn_end` *before* its tools run, so turn grouping closes a turn only when the next model phase starts (else tools land in the wrong turn).
+- What changed: step 2 — classic REPL records one trace across turns (lazy header on first prompt, `finish()` on `/quit`) + header tools catalog; steps 3–11 — `demo/` Vite+React site: `data/trace.js` parse/fold (`replay` with allow/deny branch, print/classic blocks, per-turn token deltas; deny injects the gate's exact message and truncates), frozen `samples/showcase.jsonl` v1 (synthetic 23-event run via the real recorder: read→gated write, compaction, 3 turns), light-first theme, controls bar (play/step/speed/output/branch/filter), turn-grouped timeline with sparklines, event-rail minimap with playhead, inspector (payload/messages/events tabs, L<n> cites, copy), terminal replay, `#print/allow/12` hash routing with keyboard.
+- How to verify: `npm run check` 0 errors (warnings/infos identical to baseline), trace fold test green (23 events, 3 turns, deny truncation + exact deny text, compaction dip 178→54), `npm run build` clean in `demo/`, trace confirmed inlined in the bundle, `--help` intact. Not browser-tested (no browser here) — needs your click-through. Deploy = one Vercel project rooted at `demo/` (auto-detects Vite).
+
 ## Final report
 Rebuilt nimi step by step from a 4-tool loop to a Cogent-parity lightweight
 agent: 15 tools (7 read-only, 8 gated), permission gate + TUI dialog + `--yolo`,
