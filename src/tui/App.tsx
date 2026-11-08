@@ -243,6 +243,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           tools,
           messages: messagesRef.current,
           signal: controller.signal,
+          contextLimit,
           canUseTool,
         })) {
           if (event.type === "text_delta") {
@@ -257,6 +258,10 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
             ]);
           } else if (event.type === "denied") {
             textIdRef.current = null;
+          } else if (event.type === "compacted") {
+            textIdRef.current = null;
+            const id = nextId();
+            setRows((prev) => [...prev, { kind: "text", id, text: `Auto-compacted context: ${event.before} → ${event.after} messages.` }]);
           } else if (event.type === "tool_end") {
             textIdRef.current = null;
             const summary = resultSummary(event.name, event.result, event.isError);

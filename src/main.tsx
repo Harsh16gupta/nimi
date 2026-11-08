@@ -95,10 +95,13 @@ if (args.print || !process.stdin.isTTY || !process.stdout.isTTY) {
       system,
       messages,
       tools: ALL_TOOLS,
+      contextLimit: args.contextLimit,
       canUseTool,
     })) {
       if (event.type === "text_delta") process.stdout.write(event.delta);
-      else if (event.type === "tool_start") {
+      else if (event.type === "compacted") {
+        console.log(`\n[compacted ${event.before} → ${event.after} messages]`);
+      } else if (event.type === "tool_start") {
         console.log(`\n\n[tool] ${event.name} ${JSON.stringify(event.input)}`);
       } else if (event.type === "denied") {
         console.log(`\n[denied] ${event.name}: ${event.reason}`);

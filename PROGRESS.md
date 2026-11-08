@@ -49,6 +49,11 @@
 - What changed: new `src/agent/compaction.ts` (`estimateTokens`, `getContextLimit` flag > `MODELS`, `shouldCompact` at 75%, `findSafeSplit`, `compactMessages` via current provider); TUI `/compact` + `/context`; `arg += --context-limit`; `App += contextLimit`. Auto-compact in loop deferred.
 - How to verify: `npx tsc --noEmit` OK; 1000 chars ~ 250 tokens, tiny limit triggers, summary replaces head keeping 6, orphan guard holds; `--help` shows flag.
 
+## Auto-compact in the loop (threshold check per turn)
+- What I learned: manual `/compact` only helps if you remember; checking before each provider call makes long runs self-sustaining. In-place mutation keeps the caller's array reference valid.
+- What changed: `AgentOptions += contextLimit?`, `AgentEvent += compacted {before, after}`; loop compacts then yields the notice; print logs one line, TUI adds a transcript row; both pass `contextLimit` through.
+- How to verify: `npx tsc --noEmit` OK; oversized history compacts first (`compacted` before `turn_end`), ends clean, history shrinks; `--help` works.
+
 ## Git writes (add/commit/branch/checkout/reset, gated)
 - What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
 - What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).

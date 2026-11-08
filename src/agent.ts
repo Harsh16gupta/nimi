@@ -6,6 +6,7 @@ import type {
   ToolCallBlock,
 } from "./types.ts";
 import type { CanUseTool } from "./permissions.ts";
+import { compactMessages, shouldCompact } from "./agent/compaction.ts";
 
 
 export type AgentEvent =
@@ -14,6 +15,7 @@ export type AgentEvent =
   | { type: "tool_start"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_end"; id: string; name: string; result: string; isError: boolean }
   | { type: "denied"; id: string; name: string; reason: string }
+  | { type: "compacted"; before: number; after: number }
   | { type: "turn_end" }
   | { type: "agent_end"; message: AssistantMessage };
 
@@ -25,6 +27,7 @@ export type AgentOptions = {
   system?: string;
   signal?: AbortSignal;
   maxTurns?: number;
+  contextLimit?: number;
   canUseTool?: CanUseTool;
 };
 
@@ -36,6 +39,18 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<AgentEven
 
   for (let round = 0; round < maxTurns; round++) {
     options.signal?.throwIfAborted();
+
+    // Compact before asking the model, so a long history never overflows.
+    // Mutates in place: callers hold the same array reference.
+    if (shouldCompact(options.messages, options.model, options.contextLimit)) {
+      const before = options.messages.length;
+      const result = await compactMessages(options.messages, options.provider, options.model);
+      if (result.compacted) {
+        options.messages.length = 0;
+        options.messages.push(...result.messages);
+        yield { type: "compacted", before, after: options.messages.length };
+      }
+    }
 
     let reply: AssistantMessage | undefined = undefined;
 
