@@ -1,75 +1,640 @@
-// Single-chain flow canvas: one left-to-right story, no turn lanes.
-// Hand-built SVG (original icons, editorial restraint: 1px hairlines,
-// one indigo accent, amber gate, green done, red denied). Click a node
-// to open its payload; nodes outside the fold never render, so scrubbing
-// grows the chain in place.
+// Eraser.io / Cogent-inspired interactive architecture & dataflow canvas.
+// Supports smooth drag-to-pan, wheel-to-zoom, subsystem zone frames,
+// animated dataflow packets along active edges, and both "dataflow"
+// (codebase call-graph) and "streaming" (chronological trace chain) views.
+import { useMemo, useRef, useState } from "react";
+import {
+  ARCH_EDGES,
+  ARCH_NODES,
+  ARCH_ZONES,
+  SUBSYSTEMS,
+  SUBSYSTEM_COLOR,
+} from "../data/architecture.js";
 import { buildFlow } from "../data/flow.js";
 
-const W = 118;
-const H = 82;
-const GAP = 48;
-const TOP = 24;
+function computeEdgePoints(fromNode, toNode) {
+  const fCx = fromNode.x + fromNode.w / 2;
+  const fCy = fromNode.y + fromNode.h / 2;
+  const tCx = toNode.x + toNode.w / 2;
+  const tCy = toNode.y + toNode.h / 2;
 
-const TILE = {
-  user: ["#edf0f4", "#5b6b7c"],
-  llm: ["#efedfe", "#6d5ef0"],
-  tool: ["#eaf1fe", "#2f6fed"],
-  result: ["#e9f7ef", "#16a34a"],
-  gate: ["#fdf3e3", "#b45309"],
-  compact: ["#f1ebfd", "#7c5cd6"],
-  done: ["#e9f7ef", "#16a34a"],
-};
+  // Vertical connection in same column (e.g. runMode -> appendMessages, streamEvent -> assembleBlocks)
+  if (Math.abs(fCx - tCx) < 40) {
+    const down = tCy > fCy;
+    const x1 = fCx;
+    const y1 = down ? fromNode.y + fromNode.h : fromNode.y;
+    const x2 = tCx;
+    const y2 = down ? toNode.y : toNode.y + toNode.h;
+    const my = (y1 + y2) / 2;
+    return {
+      d: `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`,
+      lx: x1 + 36,
+      ly: my,
+    };
+  }
 
-function Glyph({ kind }) {
-  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round" };
-  if (kind === "user") return <g {...p}><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6" /></g>;
-  if (kind === "llm") return <g {...p}><path d="M12 3.5l1.7 4.8 4.8 1.7-4.8 1.7L12 16.5l-1.7-4.8L5.5 10l4.8-1.7z" /><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" /></g>;
-  if (kind === "tool") return <g {...p}><circle cx="10.5" cy="10.5" r="5.8" /><path d="M15.2 15.2L20.5 20.5" /></g>;
-  if (kind === "result") return <g {...p}><path d="M6 3.5h7.5L18 8v12.5H6z" /><path d="M13.5 3.5V8H18" /></g>;
-  if (kind === "gate") return <g {...p}><path d="M12 3.5l6.5 2.6v5c0 4.6-3.2 7.4-6.5 8.4-3.3-1-6.5-3.8-6.5-8.4v-5z" /><path d="M9.2 11.8l2 2 3.6-3.8" /></g>;
-  if (kind === "compact") return <g {...p}><rect x="2.5" y="9" width="5" height="6" rx="1" /><rect x="16.5" y="9" width="5" height="6" rx="1" /><path d="M9.5 12h5M12.8 10l2 2-2 2" /></g>;
-  return <g {...p}><circle cx="12" cy="12" r="8.5" /><path d="M8.3 12.4l2.5 2.5 4.9-5.4" /></g>;
+  // Right-to-left return edge (e.g. streamEvent -> assembleBlocks, toolExecute -> runAgent, runMode -> terminal)
+  if (tCx < fCx - 30) {
+    // toolExecute -> runAgent feedback curve along bottom/middle
+    if (fromNode.id === "toolExecute" && toNode.id === "runAgent") {
+      const x1 = fromNode.x;
+      const y1 = fCy;
+      const x2 = toNode.x + toNode.w;
+      const y2 = tCy + 10;
+      return {
+        d: `M ${x1} ${y1} C ${x1 - 240} ${y1 - 40}, ${x2 + 110} ${y2 + 65}, ${x2} ${y2}`,
+        lx: (x1 + x2) / 2 - 40,
+        ly: (y1 + y2) / 2 + 12,
+      };
+    }
+    const x1 = fromNode.x;
+    const y1 = fCy;
+    const x2 = toNode.x + toNode.w;
+    const y2 = tCy;
+    const mx = (x1 + x2) / 2;
+    return {
+      d: `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`,
+      lx: mx,
+      ly: (y1 + y2) / 2 - 8,
+    };
+  }
+
+  // Standard left-to-right cubic bezier
+  const x1 = fromNode.x + fromNode.w;
+  const y1 = fCy;
+  const x2 = toNode.x;
+  const y2 = tCy;
+  const dx = Math.max(36, (x2 - x1) * 0.52);
+  return {
+    d: `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`,
+    lx: (x1 + x2) / 2,
+    ly: (y1 + y2) / 2 - 8,
+  };
 }
 
-export default function FlowCanvas({ view, header, deltas, selKey, onSelect, query }) {
-  const nodes = buildFlow(view, header, deltas);
-  const q = query?.trim().toLowerCase();
-  const width = nodes.length * (W + GAP) + GAP;
-  const midY = TOP + H / 2;
+export default function FlowCanvas({
+  view,
+  header,
+  deltas,
+  stepInfo,
+  canvasMode,
+  uiMode,
+  pinnedNodeId,
+  onSelectArchNode,
+  selTraceId,
+  onSelectTraceNode,
+}) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [showZones, setShowZones] = useState(true);
+  const [hoverGroup, setHoverGroup] = useState(null);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  // Adapt mode runner node title dynamically when user switches --print / TUI / classic
+  const nodes = useMemo(() => {
+    return ARCH_NODES.map((n) => {
+      if (n.id !== "runMode") return n;
+      if (uiMode === "tui") {
+        return {
+          ...n,
+          title: "render(<App />)",
+          sub: "src/tui/App.tsx · Ink",
+          file: "src/main.tsx:164",
+        };
+      }
+      if (uiMode === "classic") {
+        return {
+          ...n,
+          title: "runClassic()",
+          sub: "src/modes/classic.ts",
+          file: "src/modes/classic.ts:20",
+        };
+      }
+      return n;
+    });
+  }, [uiMode]);
+
+  const nodeMap = useMemo(
+    () => Object.fromEntries(nodes.map((n) => [n.id, n])),
+    [nodes],
+  );
+
+  // Count how many events in current fold hit each subsystem node
+  const hitCounts = useMemo(() => {
+    const counts = {
+      shell: 1,
+      main: 1,
+      parseArgs: 1,
+      loadSettings: 1,
+      buildSystemPrompt: 1,
+      createSession: 1,
+      runMode: 1,
+      getProvider: 1,
+      getToolDefs: 1,
+    };
+    for (const { event } of view.events) {
+      if (event.type === "agent_start") counts.runAgent = (counts.runAgent ?? 0) + 1;
+      else if (event.type === "text_delta") {
+        counts.providerStream = (counts.providerStream ?? 0) + 1;
+        counts.modelApi = (counts.modelApi ?? 0) + 1;
+        counts.streamEvent = (counts.streamEvent ?? 0) + 1;
+        counts.terminal = (counts.terminal ?? 0) + 1;
+      } else if (event.type === "turn_end") {
+        counts.assembleBlocks = (counts.assembleBlocks ?? 0) + 1;
+      } else if (event.type === "tool_start") {
+        counts.getTool = (counts.getTool ?? 0) + 1;
+        counts.canUseTool = (counts.canUseTool ?? 0) + 1;
+      } else if (event.type === "tool_end") {
+        counts.toolExecute = (counts.toolExecute ?? 0) + 1;
+        counts.terminal = (counts.terminal ?? 0) + 1;
+      } else if (event.type === "compacted") {
+        counts.shouldCompact = (counts.shouldCompact ?? 0) + 1;
+      } else if (event.type === "agent_end") {
+        counts.appendMessages = 1;
+      }
+    }
+    return counts;
+  }, [view.events]);
+
+  const traceNodes = useMemo(
+    () => buildFlow(view, header, deltas),
+    [view, header, deltas],
+  );
+
+  const handlePointerDown = (e) => {
+    if (e.target.closest("button") || e.target.closest(".arch-node")) return;
+    setDragging(true);
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      panX: pan.x,
+      panY: pan.y,
+    };
+  };
+
+  const handlePointerMove = (e) => {
+    if (!dragging) return;
+    setPan({
+      x: dragStart.current.panX + (e.clientX - dragStart.current.x),
+      y: dragStart.current.panY + (e.clientY - dragStart.current.y),
+    });
+  };
+
+  const handlePointerUp = () => setDragging(false);
+
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+    setZoom((z) => Math.max(0.65, Math.min(1.75, Number((z + delta).toFixed(2)))));
+  };
+
+  const resetFit = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const activeNodeId = pinnedNodeId ?? stepInfo.nodeId;
+  const activeEdges = new Set(stepInfo.edgeIds ?? []);
+  const secondaryNodes = new Set(stepInfo.secondaryNodes ?? []);
+
   return (
-    <div className="canvas-scroll">
-      <svg width={width} height={TOP + H + 28} role="img" aria-label="agent run flow">
-        <defs>
-          <marker id="flow-arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
-            <path d="M0 0L8 4L0 8" fill="none" stroke="#9db0a8" strokeWidth="1.4" />
-          </marker>
-        </defs>
-        {nodes.slice(0, -1).map((n, i) => {
-          const x1 = GAP + i * (W + GAP) + W;
-          const x2 = GAP + (i + 1) * (W + GAP);
-          const mx = (x1 + x2) / 2;
-          return <path key={n.key} d={`M${x1} ${midY} C${mx} ${midY}, ${mx} ${midY}, ${x2} ${midY}`} fill="none" stroke="#9db0a8" strokeWidth="1.4" markerEnd="url(#flow-arr)" />;
-        })}
-        {nodes.map((n, i) => {
-          const x = GAP + i * (W + GAP);
-          const [tile, fg] = TILE[n.kind] ?? TILE.tool;
-          const denied = n.kind === "gate" && n.denied;
-          const ring = n.key === selKey ? "#6d5ef0" : denied ? "#b91c1c" : "#dfe5e1";
-          const [bg, color] = denied ? ["#fdeaea", "#b91c1c"] : [tile, fg];
-          const dimmed = q && !(n.title + " " + n.sub + " " + (n.text ?? "")).toLowerCase().includes(q);
-          return (
-            <g key={n.key} transform={`translate(${x},${TOP})`} className={`fnode${n.key === selKey ? " sel" : ""}`} onClick={() => onSelect(n)} opacity={dimmed ? 0.22 : 1}>
-              <rect width={W} height={H} rx="14" fill="#fff" stroke={ring} strokeWidth={n.key === selKey || denied ? 2 : 1} />
-              <rect x={(W - 30) / 2} y="8" width="30" height="30" rx="9" fill={bg} />
-              <g transform="translate(49,13) scale(0.85)" style={{ color }}>
-                <Glyph kind={n.kind} />
-              </g>
-              <text x={W / 2} y="56" textAnchor="middle" fontSize="11.5" fontWeight="600" fill="#17322c">{n.title}</text>
-              <text x={W / 2} y="70" textAnchor="middle" fontSize="9.5" fontFamily="ui-monospace,monospace" fill="#5d746d">{n.sub}</text>
-            </g>
-          );
-        })}
-      </svg>
+    <div
+      className={`canvas-stage${dragging ? " is-dragging" : ""}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
+      onWheel={handleWheel}
+    >
+      {/* Top-left floating zoom / fit HUD (Cogent + Eraser.io style) */}
+      <div className="canvas-hud">
+        <button type="button" className="hud-btn" onClick={resetFit} title="Reset pan and zoom">
+          fit
+        </button>
+        <button
+          type="button"
+          className="hud-btn"
+          onClick={() => setZoom((z) => Math.min(1.75, Number((z + 0.12).toFixed(2))))}
+          title="Zoom in"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="hud-btn"
+          onClick={() => setZoom((z) => Math.max(0.65, Number((z - 0.12).toFixed(2))))}
+          title="Zoom out"
+        >
+          −
+        </button>
+        <span className="hud-zoom-pct">{Math.round(zoom * 100)}%</span>
+        {canvasMode === "dataflow" && (
+          <button
+            type="button"
+            className={`hud-btn hud-toggle${showZones ? " on" : ""}`}
+            onClick={() => setShowZones((s) => !s)}
+            title="Toggle architectural subsystem frames"
+          >
+            zones
+          </button>
+        )}
+        {pinnedNodeId && (
+          <button
+            type="button"
+            className="hud-btn hud-unpin"
+            onClick={() => onSelectArchNode(null)}
+            title="Resume following step playback"
+          >
+            unpin ({pinnedNodeId}) ✕
+          </button>
+        )}
+      </div>
+
+      {/* Interactive pan/zoom viewport */}
+      <div className="canvas-viewport">
+        <div
+          className="canvas-transform"
+          style={{
+            transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+          }}
+        >
+          {canvasMode === "dataflow" ? (
+            <svg
+              viewBox="0 0 1585 510"
+              className="arch-svg"
+              role="img"
+              aria-label="Nimi codebase architecture and dataflow graph"
+            >
+              <defs>
+                <marker
+                  id="arrow-dim"
+                  markerWidth="7"
+                  markerHeight="7"
+                  refX="6"
+                  refY="3.5"
+                  orient="auto"
+                >
+                  <path
+                    d="M0.5 1 L6 3.5 L0.5 6"
+                    fill="none"
+                    stroke="#48443E"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </marker>
+                <marker
+                  id="arrow-hot"
+                  markerWidth="7"
+                  markerHeight="7"
+                  refX="6"
+                  refY="3.5"
+                  orient="auto"
+                >
+                  <path
+                    d="M0.5 1 L6 3.5 L0.5 6"
+                    fill="none"
+                    stroke="#D97750"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </marker>
+                <filter id="node-glow" x="-25%" y="-25%" width="150%" height="150%">
+                  <feDropShadow
+                    dx="0"
+                    dy="0"
+                    stdDeviation="6"
+                    floodColor="#D97750"
+                    floodOpacity="0.32"
+                  />
+                </filter>
+              </defs>
+
+              {/* Eraser.io style subtle subsystem container zones */}
+              {showZones &&
+                ARCH_ZONES.map((z) => (
+                  <g key={z.id} className="arch-zone">
+                    <rect
+                      x={z.x}
+                      y={z.y}
+                      width={z.w}
+                      height={z.h}
+                      rx="10"
+                      fill="rgba(26, 25, 23, 0.36)"
+                      stroke="#252320"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                    />
+                    <text
+                      x={z.x + 10}
+                      y={z.y + 14}
+                      fontSize="9"
+                      fontFamily="var(--mono)"
+                      letterSpacing="0.09em"
+                      fill="#545049"
+                    >
+                      {z.label}
+                    </text>
+                  </g>
+                ))}
+
+              {/* Directed call-graph edges */}
+              {ARCH_EDGES.map((edge) => {
+                const fromNode = nodeMap[edge.from];
+                const toNode = nodeMap[edge.to];
+                if (!fromNode || !toNode) return null;
+                const { d, lx, ly } = computeEdgePoints(fromNode, toNode);
+                const isHot =
+                  activeEdges.has(edge.id) ||
+                  (pinnedNodeId && (edge.from === pinnedNodeId || edge.to === pinnedNodeId));
+
+                return (
+                  <g key={edge.id} className="arch-edge">
+                    {isHot && (
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="#D97750"
+                        strokeWidth="4.5"
+                        strokeOpacity="0.14"
+                      />
+                    )}
+                    <path
+                      d={d}
+                      fill="none"
+                      stroke={isHot ? "#D97750" : "#3A3733"}
+                      strokeWidth={isHot ? "1.65" : "1.15"}
+                      markerEnd={isHot ? "url(#arrow-hot)" : "url(#arrow-dim)"}
+                    />
+                    {isHot && (
+                      <path
+                        d={d}
+                        fill="none"
+                        stroke="#F4B297"
+                        strokeWidth="1.65"
+                        strokeDasharray="4 10"
+                        className="edge-packet-flow"
+                      />
+                    )}
+                    {isHot && (
+                      <g transform={`translate(${lx}, ${ly})`}>
+                        <rect
+                          x="-44"
+                          y="-9"
+                          width="88"
+                          height="17"
+                          rx="4"
+                          fill="#181715"
+                          stroke="#5A392B"
+                          strokeWidth="1"
+                        />
+                        <text
+                          x="0"
+                          y="2.5"
+                          textAnchor="middle"
+                          fontSize="9.5"
+                          fontFamily="var(--mono)"
+                          fill="#E59877"
+                        >
+                          {edge.label}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* Codebase architecture nodes */}
+              {nodes.map((node) => {
+                const isPrimary = node.id === activeNodeId;
+                const isSecondary = !isPrimary && secondaryNodes.has(node.id);
+                const groupColor = SUBSYSTEM_COLOR[node.group] ?? "#D97750";
+                const hits = hitCounts[node.id] ?? 0;
+                const isDeniedNode =
+                  view.denied && node.id === "canUseTool" && stepInfo.shortPhase === "denied";
+                const dimmedByHover = hoverGroup && node.group !== hoverGroup;
+
+                let fill = "#1D1C1A";
+                let stroke = "#32302B";
+                let titleFill = "#ECE9E2";
+                let subFill = "#7D776F";
+
+                if (isSecondary) {
+                  fill = "#231E1B";
+                  stroke = "#6D4635";
+                }
+                if (isPrimary) {
+                  fill = isDeniedNode ? "#2C1919" : "#2D201A";
+                  stroke = isDeniedNode ? "#D96060" : "#D97750";
+                  titleFill = "#FFFFFF";
+                  subFill = isDeniedNode ? "#E89B9B" : "#D5A18A";
+                }
+
+                return (
+                  <g
+                    key={node.id}
+                    transform={`translate(${node.x}, ${node.y})`}
+                    className={`arch-node${isPrimary ? " is-active" : ""}`}
+                    onClick={() =>
+                      onSelectArchNode(pinnedNodeId === node.id ? null : node.id)
+                    }
+                    opacity={dimmedByHover ? 0.25 : 1}
+                  >
+                    <rect
+                      width={node.w}
+                      height={node.h}
+                      rx="6"
+                      fill={fill}
+                      stroke={stroke}
+                      strokeWidth={isPrimary ? "1.6" : "1"}
+                      filter={isPrimary ? "url(#node-glow)" : undefined}
+                    />
+                    {/* Subsystem left accent pill */}
+                    <rect
+                      x="0.5"
+                      y="8"
+                      width="2.5"
+                      height={node.h - 16}
+                      rx="1.25"
+                      fill={groupColor}
+                      opacity={isPrimary ? 1 : 0.72}
+                    />
+                    {/* Function / Module name */}
+                    <text
+                      x="11"
+                      y="20"
+                      fontSize="11.5"
+                      fontWeight="600"
+                      fontFamily="var(--mono)"
+                      fill={titleFill}
+                    >
+                      {node.title}
+                    </text>
+                    {/* File path */}
+                    <text
+                      x="11"
+                      y="35"
+                      fontSize="9.8"
+                      fontFamily="var(--mono)"
+                      fill={subFill}
+                    >
+                      {node.sub}
+                    </text>
+                    {/* Call hit badge */}
+                    {hits > 0 && (
+                      <g transform={`translate(${node.w - 22}, 13)`}>
+                        <rect
+                          x="-10"
+                          y="-7"
+                          width="22"
+                          height="14"
+                          rx="3.5"
+                          fill={isPrimary ? "rgba(217, 119, 80, 0.22)" : "#151413"}
+                          stroke={isPrimary ? "#D97750" : "#2C2A26"}
+                          strokeWidth="0.8"
+                        />
+                        <text
+                          x="1"
+                          y="3"
+                          textAnchor="middle"
+                          fontSize="8.5"
+                          fontFamily="var(--mono)"
+                          fill={isPrimary ? "#F2B094" : "#807A72"}
+                        >
+                          ×{hits}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              })}
+            </svg>
+          ) : (
+            /* "streaming" view: chronological execution trace chain in the same compact card language */
+            <svg
+              viewBox="0 0 1540 360"
+              className="arch-svg"
+              role="img"
+              aria-label="Nimi streaming execution chain"
+            >
+              <defs>
+                <marker
+                  id="s-arrow"
+                  markerWidth="7"
+                  markerHeight="7"
+                  refX="6"
+                  refY="3.5"
+                  orient="auto"
+                >
+                  <path
+                    d="M0.5 1 L6 3.5 L0.5 6"
+                    fill="none"
+                    stroke="#D97750"
+                    strokeWidth="1.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </marker>
+              </defs>
+              {traceNodes.map((n, idx) => {
+                const col = idx % 6;
+                const row = Math.floor(idx / 6);
+                const x = 44 + col * 244;
+                const y = 66 + row * 140;
+                const w = 202;
+                const h = 58;
+                const isSel =
+                  n.id === selTraceId ||
+                  n.IdShort === selTraceId ||
+                  idx === traceNodes.length - 1;
+                const next = traceNodes[idx + 1];
+                let edgePath = null;
+                if (next) {
+                  const nCol = (idx + 1) % 6;
+                  const nRow = Math.floor((idx + 1) / 6);
+                  const nx = 44 + nCol * 244;
+                  const ny = 66 + nRow * 140;
+                  if (nRow === row) {
+                    edgePath = `M ${x + w} ${y + h / 2} L ${nx} ${ny + h / 2}`;
+                  } else {
+                    edgePath = `M ${x + w / 2} ${y + h} C ${x + w / 2} ${y + h + 44}, ${nx + w / 2} ${ny - 44}, ${nx + w / 2} ${ny}`;
+                  }
+                }
+                return (
+                  <g key={n.id}>
+                    {edgePath && (
+                      <path
+                        d={edgePath}
+                        fill="none"
+                        stroke="#7E503D"
+                        strokeWidth="1.4"
+                        markerEnd="url(#s-arrow)"
+                      />
+                    )}
+                    <g
+                      transform={`translate(${x}, ${y})`}
+                      className="arch-node"
+                      onClick={() => onSelectTraceNode(n)}
+                    >
+                      <rect
+                        width={w}
+                        height={h}
+                        rx="6"
+                        fill={isSel ? "#2D201A" : "#1D1C1A"}
+                        stroke={isSel ? "#D97750" : "#32302B"}
+                        strokeWidth={isSel ? "1.6" : "1"}
+                      />
+                      <text
+                        x="12"
+                        y="23"
+                        fontSize="11.5"
+                        fontWeight="600"
+                        fontFamily="var(--mono)"
+                        fill="#ECE9E2"
+                      >
+                        {n.title}
+                      </text>
+                      <text
+                        x="12"
+                        y="41"
+                        fontSize="10"
+                        fontFamily="var(--mono)"
+                        fill="#8E8980"
+                      >
+                        {n.sub}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom canvas legend & keyboard/mouse hint bar */}
+      <div className="canvas-footer-bar">
+        <div className="subsystem-legend">
+          {SUBSYSTEMS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`legend-chip${hoverGroup === s.id ? " active" : ""}`}
+              onMouseEnter={() => setHoverGroup(s.id)}
+              onMouseLeave={() => setHoverGroup(null)}
+              onClick={() => setHoverGroup((g) => (g === s.id ? null : s.id))}
+            >
+              <i className="legend-swatch" style={{ background: s.color }} />
+              <span>{s.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="canvas-hints">
+          drag to pan · scroll to zoom · ←/→ to step · space to play
+        </div>
+      </div>
     </div>
   );
 }

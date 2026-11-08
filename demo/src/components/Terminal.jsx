@@ -1,5 +1,4 @@
-// Print/classic output replay, mirroring src/main.tsx and
-// src/modes/classic.ts formatting from the same folded events.
+// Terminal replay pane for the Inspector "stdout" tab.
 function lines(blocks) {
   const out = [];
   for (const b of blocks) {
@@ -13,9 +12,14 @@ function lines(blocks) {
 
 export default function Terminal({ blocks, output }) {
   return (
-    <section className="card">
-      <div className="kv">terminal · {output} mode</div>
-      <pre className="term">{blocks.length > 0 ? lines(blocks) : "(no output yet — press ▶)"}</pre>
-    </section>
+    <>
+      <div className="data-header">
+        <span>
+          <strong className="data-tag">STDOUT</strong>{" "}
+          {output.toUpperCase()} MODE REPLAY
+        </span>
+      </div>
+      <pre className="code-viewer">{blocks.length > 0 ? lines(blocks) : "(no output yet — press ▶ play)"}</pre>
+    </>
   );
 }

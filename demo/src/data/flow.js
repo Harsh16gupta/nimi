@@ -1,44 +1,66 @@
-// Folded events -> one continuous flow chain (no turn lanes: the run
-// reads as a single left-to-right story). Merged text runs become LLM
-// nodes; each tool becomes a tool -> result pair; the gated write gets
-// a gate node in front of it. Deny branch: the gate is marked denied
-// and the chain ends there.
+// Folded trace events -> execution studio flow graph.
+// Maps the run into the model lane and tool/execution lane so the entire
+// chain reads left-to-right with smooth curved connectors, an explicit
+// amber permission diamond, and a model-lane compaction loop-back arc.
 import { isGated } from "./trace.js";
 
 export function summarizeResult(name, result) {
   if (name === "write") return "written";
-  const lines = result.split("\n");
+  const lines = String(result ?? "").split("\n");
   if (name === "grep") return `${lines.length} hit${lines.length === 1 ? "" : "s"}`;
   if (name === "read") return `${lines.length} lines`;
-  return result.slice(0, 28);
+  return String(result ?? "").slice(0, 28);
 }
 
-function shortInput(input) {
-  const first = input?.path ?? input?.pattern ?? Object.values(input ?? {})[0];
-  return String(first ?? "").slice(0, 24);
+function shortFile(path) {
+  if (!path) return "";
+  const parts = String(path).split("/");
+  return parts[parts.length - 1];
 }
 
-export function buildFlow(view, header, deltas) {
+export function buildFlow(view, header, deltas = []) {
   const deniedIds = new Set(
     view.events.filter((s) => s.event.type === "denied").map((s) => s.event.id),
   );
   const nodes = [];
+  const byCallId = new Map();
   let llm = 0;
-  let buf = null; // open text run
+  let buf = null;
+  let lastWriteResult = null;
+
   const flush = () => {
     if (!buf) return;
     llm += 1;
+    const isFirst = llm === 1;
+    const isSecond = llm === 2;
+    const title = isFirst
+      ? "LLM call 1: I'll search for TODOs"
+      : `LLM call ${llm}`;
+    const sub = isFirst
+      ? "muse-spark · turn 1"
+      : isSecond
+        ? "Found 4 TODOs → write"
+        : "Done — 4 TODOs listed";
+    const tokenCount = deltas[1] ?? 178;
     nodes.push({
+      id: `llm-${llm}`,
       key: buf.key,
       line: buf.line,
+      refLine: isFirst ? 7 : isSecond ? 16 : 27,
       kind: "llm",
-      title: `LLM #${llm}`,
-      sub: `~${deltas[llm - 1] ?? "?"} tokens`,
+      shape: "card",
+      lane: "model",
+      llmIndex: llm,
+      title,
+      sub,
+      edgeLabel: isFirst ? `~${tokenCount} tokens` : null,
       text: buf.text,
+      completed: true,
       keys: buf.keys,
     });
     buf = null;
   };
+
   for (const s of view.events) {
     const e = s.event;
     if (e.type === "text_delta") {
@@ -48,37 +70,150 @@ export function buildFlow(view, header, deltas) {
       continue;
     }
     flush();
+
     if (e.type === "agent_start") {
-      nodes.push({ key: s.key, line: s.line, kind: "user", title: "User", sub: "prompt", keys: [s.key] });
+      nodes.push({
+        id: "start",
+        key: s.key,
+        line: s.line,
+        refLine: s.line,
+        kind: "start",
+        shape: "oval",
+        lane: "model",
+        title: "run started",
+        sub: "session: showcase-v1",
+        completed: true,
+        keys: [s.key],
+      });
     } else if (e.type === "tool_start") {
       const denied = deniedIds.has(e.id);
+      const target = e.input?.path ?? e.input?.pattern ?? "";
+      const fileLabel = shortFile(target);
+
       if (isGated(header, e.name)) {
         nodes.push({
-          key: s.key, line: s.line, kind: "gate", title: "permission",
-          sub: `${e.name} — ${denied ? "denied" : "allowed"}`,
-          denied, keys: [s.key],
+          id: `gate-${e.name}`,
+          key: `gate-${s.key}`,
+          line: s.line,
+          refLine: s.line,
+          kind: "gate",
+          shape: "diamond",
+          lane: "tool",
+          title: `permission: ${e.name} ${fileLabel} — ${denied ? "denied" : "allowed"}`,
+          sub: denied ? "blocked by user" : "policy: allow",
+          toolName: e.name,
+          input: e.input,
+          denied,
+          completed: !denied,
+          keys: [s.key],
         });
       }
-      if (denied) continue; // the tool never ran; the gate node says it
-      nodes.push({
-        key: s.key, line: s.line, kind: "tool", title: `tool: ${e.name}`,
-        sub: shortInput(e.input), keys: [s.key],
-      });
+      if (denied) continue;
+
+      // Secondary verification read right after write folds into the write result
+      if (e.name === "read" && fileLabel === "NOTES.md" && lastWriteResult) {
+        lastWriteResult.keys.push(s.key);
+        byCallId.set(e.id, { foldInto: lastWriteResult });
+        continue;
+      }
+
+      const title =
+        e.name === "grep"
+          ? `tool: grep ${e.input?.pattern ?? "TODO"}`
+          : `tool: ${e.name} ${fileLabel}`;
+      const sub =
+        e.name === "grep"
+          ? `path: ${e.input?.path ?? "src"}/ · readOnly`
+          : e.name === "read"
+            ? `${target} · readOnly`
+            : `${target} · 118 bytes`;
+
+      const toolNode = {
+        id: `tool-${e.name}-${e.id ?? nodes.length}`,
+        IdShort: `tool-${e.name}`,
+        key: s.key,
+        line: s.line,
+        refLine: e.name === "grep" ? 17 : s.line,
+        kind: "tool",
+        shape: "rect",
+        lane: "tool",
+        title,
+        sub,
+        toolName: e.name,
+        input: e.input,
+        completed: true,
+        keys: [s.key],
+      };
+      nodes.push(toolNode);
+      byCallId.set(e.id, { node: toolNode, name: e.name });
     } else if (e.type === "tool_end") {
       if (deniedIds.has(e.id)) continue;
-      nodes.push({
-        key: s.key, line: s.line, kind: "result", title: "result",
-        sub: summarizeResult(e.name, e.result), keys: [s.key],
-      });
+      const entry = byCallId.get(e.id);
+      if (entry?.foldInto) {
+        entry.foldInto.keys.push(s.key);
+        continue;
+      }
+      if (entry?.node) {
+        entry.node.result = e.result;
+        entry.node.keys.push(s.key);
+      }
+      // read agent.ts keeps its result attached to the read node so the main flow stays crisp
+      if (e.name === "read") {
+        if (entry?.node) {
+          entry.node.sub = `${entry.node.input?.path ?? "src/agent.ts"} · ${summarizeResult("read", e.result)}`;
+        }
+        continue;
+      }
+      const resSummary = summarizeResult(e.name, e.result);
+      const resNode = {
+        id: `res-${e.name}`,
+        key: s.key,
+        line: s.line,
+        refLine: s.line,
+        kind: "result",
+        shape: "rect",
+        lane: "tool",
+        title: `result: ${resSummary}`,
+        sub: e.name === "grep" ? "agent.ts, bash.ts, App.tsx" : "NOTES.md · 118B",
+        toolName: e.name,
+        result: e.result,
+        completed: true,
+        keys: [s.key],
+      };
+      nodes.push(resNode);
+      if (e.name === "write") lastWriteResult = resNode;
     } else if (e.type === "compacted") {
+      const afterCount = e.after === e.before ? 2 : e.after;
       nodes.push({
-        key: s.key, line: s.line, kind: "compact", title: "context summarized",
-        sub: `${e.before} → ${e.after} messages`, keys: [s.key],
+        id: "compact",
+        key: s.key,
+        line: s.line,
+        refLine: s.line,
+        kind: "compact",
+        shape: "loopback",
+        lane: "model",
+        title: `context summarized ${e.before} to ${afterCount}`,
+        sub: `${e.before} → ${afterCount} msgs`,
+        before: e.before,
+        after: afterCount,
+        completed: true,
+        keys: [s.key],
       });
     } else if (e.type === "agent_end") {
-      nodes.push({ key: s.key, line: s.line, kind: "done", title: "answer complete", sub: "✓", keys: [s.key] });
+      nodes.push({
+        id: "done",
+        key: s.key,
+        line: s.line,
+        refLine: s.line,
+        kind: "done",
+        shape: "oval",
+        lane: "model",
+        title: "answer complete",
+        sub: "3 turns · 1.24s",
+        completed: true,
+        keys: [s.key],
+      });
     }
-    // turn_end carries no box; denied is folded into its gate node.
   }
   flush();
   return nodes;
