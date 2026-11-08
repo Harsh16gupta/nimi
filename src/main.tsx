@@ -61,7 +61,8 @@ if (args.listSessions) {
 
 // Piped / non-interactive: keep the old one-shot behavior so scripts
 // and non-TTY environments still work. --print forces it in a TTY too.
-if (args.print || !process.stdin.isTTY || !process.stdout.isTTY) {
+// --classic always wins: an explicit REPL request beats pipe detection.
+if (!args.classic && (args.print || !process.stdin.isTTY || !process.stdout.isTTY)) {
   if (!args.prompt) {
     console.error('No prompt given. Run "nimi --help" for usage.');
     process.exit(1);
@@ -138,6 +139,12 @@ if (args.session) {
   tuiSessionId = newSessionId();
   tuiMessages = [];
   await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: provider.name });
+}
+
+if (args.classic) {
+  const { runClassic } = await import("./modes/classic.ts");
+  await runClassic({ provider, model, system, tools: ALL_TOOLS, sessionId: tuiSessionId, initialMessages: tuiMessages, yolo: args.yolo, contextLimit: args.contextLimit });
+  process.exit(0);
 }
 
 render(

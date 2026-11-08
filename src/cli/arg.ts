@@ -5,6 +5,7 @@ export interface CliArgs {
 	session?: string; // --session: resume a saved session id
 	listSessions: boolean; // --list-sessions: print saved sessions and exit
 	contextLimit?: number; // --context-limit: override the model's context window
+	classic: boolean; // --classic: plain readline REPL instead of the TUI
 	print: boolean; // --print: force one-shot print mode even in a TTY
 	yolo: boolean; // --yolo: run all tools without asking
 	version: boolean; // -v / --version
@@ -17,6 +18,7 @@ export function parseArgs(argv: string[]): CliArgs {
 	const args: CliArgs = {
 		provider: undefined,
 		listSessions: false,
+		classic: false,
 		print: false,
 		yolo: false,
 		version: false,
@@ -67,6 +69,9 @@ export function parseArgs(argv: string[]): CliArgs {
 				args.contextLimit = n;
 				break;
 			}
+			case "--classic":
+				args.classic = true;
+				break;
 			case "--print":
 				args.print = true;
 				break;
@@ -115,6 +120,7 @@ OPTIONS
       --session <id>     Resume a saved session
       --list-sessions    Print saved sessions, then exit
       --context-limit <n> Override the model's context window
+      --classic          Plain readline REPL instead of the TUI
       --print            Force one-shot print mode even in a TTY
       --yolo             Run all tools without asking
   -v, --version          Show version

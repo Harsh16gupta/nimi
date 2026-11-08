@@ -59,6 +59,11 @@
 - What changed: `slash.ts` parses `/model <id>` arg + 3 new actions; `App` holds `activeProvider/activeModel` (history kept across switches, missing-key errors shown inline) and renders the four read-only commands.
 - How to verify: `npx tsc --noEmit` OK; `/model` lists, bad id errors, `/tools` tags ro/ask, `/sessions`/`/session` print; `--help` unchanged.
 
+## Classic REPL (readline, same generator and slashes)
+- What I learned: print stays the non-TTY default so pipes never change; `--classic` wins over pipe detection because it's an explicit interactive request.
+- What changed: new `src/modes/classic.ts` (prompt loop, full slash set, `/model` switch, per-turn save); `arg += --classic`; `main.tsx` routes to it before Ink. TUI untouched.
+- How to verify: `npx tsc --noEmit` OK; piped `quit` exits clean with banner; pipe print still one-shots; `--help` shows flag.
+
 ## Git writes (add/commit/branch/checkout/reset, gated)
 - What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
 - What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).
