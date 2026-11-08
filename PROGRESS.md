@@ -33,3 +33,8 @@
 - What I learned: one shared JSON string corrupts parallel tool inputs; an unguarded `JSON.parse` crashes the loop on partial args; `process.env.X!` gives cryptic crashes.
 - What changed: `anthropic.ts` keeps one buffer per block routed by stream index + safe parse; `openai-compat.ts` safe-parses args; new `providers/models.ts` (`MODELS` + `getModelInfo`); `index.ts` uses friendly `requireKey` errors and adds `openai` entry.
 - How to verify: `npx tsc --noEmit` OK; registry lists 5 models, unknown provider/key errors are readable; `--help` works.
+
+## Sessions (JSONL save, resume, list)
+- What I learned: memory-only history dies on exit; append-only JSONL (one entry per line) survives crashes and resumes by re-reading lines. Save only what the run added (`messages.slice(before)`) so resume never duplicates.
+- What changed: new `src/session/store.ts` (`session_info` + `message` entries under `.nimi/sessions/`, tolerant load); `arg.ts` adds `--session/--list-sessions`; print-mode creates/resumes/saves and prints the resume id to stderr. TUI persist deferred.
+- How to verify: `npx tsc --noEmit` OK; offline round-trip (save 1 msg, load 1 msg, missing -> null, listed); `--list-sessions` prints newest-first; `--help` works.

@@ -2,6 +2,8 @@ export interface CliArgs {
 	prompt?: string; // -p / --prompt: the text to send to the model
 	provider: string; // -z / --provider: which provider to use
 	model?: string; // --model: override the provider's default model
+	session?: string; // --session: resume a saved session id
+	listSessions: boolean; // --list-sessions: print saved sessions and exit
 	yolo: boolean; // --yolo: run all tools without asking
 	version: boolean; // -v / --version
 	help: boolean; // -h / --help
@@ -12,6 +14,7 @@ const DEFAULT_PROVIDER = "meta";
 export function parseArgs(argv: string[]): CliArgs {
 	const args: CliArgs = {
 		provider: DEFAULT_PROVIDER,
+		listSessions: false,
 		yolo: false,
 		version: false,
 		help: false,
@@ -48,6 +51,12 @@ export function parseArgs(argv: string[]): CliArgs {
 				break;
 			case "--model":
 				args.model = value();
+				break;
+			case "--session":
+				args.session = value();
+				break;
+			case "--list-sessions":
+				args.listSessions = true;
 				break;
 			case "--yolo":
 				args.yolo = true;
@@ -91,6 +100,8 @@ OPTIONS
   -p, --prompt <text>    The prompt to send to the model
   -z, --provider <name>  Provider to use (default: ${DEFAULT_PROVIDER})
       --model <id>       Model ID (defaults to the provider's model)
+      --session <id>     Resume a saved session
+      --list-sessions    Print saved sessions, then exit
       --yolo             Run all tools without asking
   -v, --version          Show version
   -h, --help             Show this help
