@@ -8,6 +8,7 @@ import { loadSettings } from "./config/settings.ts";
 import { allowAll, createPromptPermission } from "./permissions.ts";
 import { getProvider } from "./providers/index.ts";
 import { appendEntry, appendMessages, listSessions, loadSession, newSessionId } from "./session/store.ts";
+import { createTraceRecorder, withTrace } from "./trace/recorder.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
 import type { Message } from "./types.ts";
 
@@ -86,11 +87,22 @@ if (!args.classic && (args.print || !process.stdin.isTTY || !process.stdout.isTT
   }
   console.error(`Session ${sessionId} — resume with: --session ${sessionId}`);
   const before = messages.length;
+  // --trace tees every event to JSONL for the showcase site; the loop
+  // below renders exactly as without it (withTrace yields through).
+  const trace = args.trace
+    ? createTraceRecorder(args.trace, {
+        session: sessionId,
+        provider: provider.name,
+        model,
+        prompt: args.prompt,
+        argv: process.argv.slice(2),
+      })
+    : null;
   // --yolo skips prompts; otherwise ask y/a/n for each write tool.
   const rl = args.yolo ? null : createInterface({ input: process.stdin, output: process.stdout });
   const canUseTool = args.yolo ? allowAll() : createPromptPermission(rl!);
   try {
-    for await (const event of runAgent({
+    const stream = runAgent({
       provider,
       model,
       system,
@@ -98,7 +110,8 @@ if (!args.classic && (args.print || !process.stdin.isTTY || !process.stdout.isTT
       tools: ALL_TOOLS,
       contextLimit: args.contextLimit,
       canUseTool,
-    })) {
+    });
+    for await (const event of trace ? withTrace(stream, trace, messages) : stream) {
       if (event.type === "text_delta") process.stdout.write(event.delta);
       else if (event.type === "compacted") {
         console.log(`\n[compacted ${event.before} → ${event.after} messages]`);

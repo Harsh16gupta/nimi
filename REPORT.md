@@ -79,6 +79,11 @@
 - What changed: `biome.json` (lint recommended, no format), `App.nextId` wrapped in `useCallback([])` + deps, `npm run check` (lint + tsc), `npm run test:tools`, `test/tools.test.ts` (7 tests, temp-dir, no keys).
 - How to verify: `npm run check` exit 0 (warnings/infos accepted, 0 errors); `test:tools` 7/7 green.
 
+## Showcase step 1: Trace recorder (`--trace` + print wiring)
+- What I learned: the header can't know turn/tool counts up front, so streaming (crash-safe) wins over buffering: header carries identity (session/provider/model/prompt/started_at/argv), the `end` line carries `counts{turns,tools}` + `messageCount`; the viewer will read totals from `end`.
+- What changed: new `src/trace/recorder.ts` (`createTraceRecorder` header/event/snapshot/end JSONL lines, sync appends, `withTrace` tee wrapper that yields events through unchanged and seals the file in `finally`); `arg.ts += --trace <path>`; `main.tsx` print mode wraps `runAgent` only when the flag is set. No type-shape change (additive `trace?` only).
+- How to verify: `npm run check` 0 errors; `--help` shows the flag; offline fake-provider smoke (2 turns, 1 tool): 7 events tee'd through, sequential `i`, 3 snapshots (turn_end×2 + agent_end), `end{turns:2,tools:1}`; without the flag the loop is untouched.
+
 ## Final report
 Rebuilt nimi step by step from a 4-tool loop to a Cogent-parity lightweight
 agent: 15 tools (7 read-only, 8 gated), permission gate + TUI dialog + `--yolo`,
