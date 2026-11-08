@@ -78,3 +78,13 @@
 - What I learned: full-tree reformat (25 files) destroys history readability — scoped Biome to lint only, formatter off; the only 2 errors were real (`nextId` recreated per render, flagged by exhaustive-deps).
 - What changed: `biome.json` (lint recommended, no format), `App.nextId` wrapped in `useCallback([])` + deps, `npm run check` (lint + tsc), `npm run test:tools`, `test/tools.test.ts` (7 tests, temp-dir, no keys).
 - How to verify: `npm run check` exit 0 (warnings/infos accepted, 0 errors); `test:tools` 7/7 green.
+
+## Final report
+Rebuilt nimi step by step from a 4-tool loop to a Cogent-parity lightweight
+agent: 15 tools (7 read-only, 8 gated), permission gate + TUI dialog + `--yolo`,
+generator loop with denied/compacted events, hardened providers + model registry,
+JSONL sessions in print + TUI + classic, settings cascade, slash essentials,
+manual + auto compaction. Verify: `npm run check` (0 errors), `npm run
+test:tools` (7/7 offline green), `npx tsx src/main.tsx --help`.
+Intentionally left out: `/tree` branch summaries, extension hooks, Markdown TUI,
+full TUI chrome — weight, not capability.
