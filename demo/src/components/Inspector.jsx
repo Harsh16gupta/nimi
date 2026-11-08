@@ -16,9 +16,12 @@ export default function Inspector({ view, parsed, sel }) {
   const [tab, setTab] = useState("payload");
   const [copied, setCopied] = useState(false);
 
-  // Selected step, else the latest tool-ish event in the fold.
-  const step =
-    sel ?? [...view.events].reverse().find((s) => s.event.type.startsWith("tool") || s.event.type === "denied") ?? null;
+  // Selected step, else the latest tool-ish event in the fold. A pinned
+  // step from a later frame falls back once scrubbed out of the fold.
+  const inFold = sel && view.events.some((s) => s.key === sel.key);
+  const step = inFold
+    ? sel
+    : ([...view.events].reverse().find((s) => s.event.type.startsWith("tool") || s.event.type === "denied") ?? null);
 
   const totals = parsed.items.filter((it) => it.obj.type === "messages").map((it) => estimateTokens(it.obj.messages));
   const maxTokens = Math.max(1, ...totals);

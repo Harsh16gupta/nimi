@@ -83,10 +83,12 @@ body {
 .spark { display: inline-flex; gap: 2px; align-items: flex-end; }
 .spark i { width: 6px; background: var(--teal); border-radius: 2px; opacity: 0.75; }
 
-.step { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 6px 0; }
+.step { border-left: 3px solid var(--line); padding: 4px 0 4px 10px; margin: 6px 0; cursor: pointer; }
+.step.tool { border-color: var(--teal); }
 .step.tool { border-color: var(--teal); }
 .step.result { border-color: var(--green); }
 .step.result.err { border-color: var(--red); }
+.step.now { outline: 2px solid var(--teal); border-radius: 0 8px 8px 0; }
 .step.denied, .step.note { border-color: var(--amber); }
 .step .kind { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .step p { margin: 2px 0; }
