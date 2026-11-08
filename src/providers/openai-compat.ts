@@ -140,11 +140,17 @@ export function createOpenAICompat(
             for (const tool of toolCalls) {
                 if (!tool) continue;
 
+                // Partial streaming args are not valid JSON; never crash here.
+                let parsed: Record<string, unknown> = {};
+                if (tool.arguments) {
+                    try { parsed = JSON.parse(tool.arguments); }
+                    catch { parsed = {}; }
+                }
                 content.push({
                     type: "toolCall",
                     id: tool.id,
                     name: tool.name,
-                    arguments: tool.arguments ? JSON.parse(tool.arguments) : {},
+                    arguments: parsed,
                 });
             }
 

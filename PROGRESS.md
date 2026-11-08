@@ -28,3 +28,8 @@
 - What I learned: callback `onEvent` forced UIs to share one shape and hid denials; yielding lets print/TUI consume the same stream. Stop-reason lies (Gemini `end_turn` with tools), blocks don't.
 - What changed: `runAgent` is `async *` yielding `agent_start/text_delta/tool_start/tool_end/denied/turn_end/agent_end`; `maxTurns` 10->20; `main.tsx` + `App.tsx` use `for await`. Deny yields `denied` then error `tool_end`.
 - How to verify: `npx tsc --noEmit` OK; fake-provider smoke: stop+toolCall still runs tool, deny emits `denied+tool_end`; `--help` works.
+
+## Provider hardening (parallel calls, safe JSON, model registry)
+- What I learned: one shared JSON string corrupts parallel tool inputs; an unguarded `JSON.parse` crashes the loop on partial args; `process.env.X!` gives cryptic crashes.
+- What changed: `anthropic.ts` keeps one buffer per block routed by stream index + safe parse; `openai-compat.ts` safe-parses args; new `providers/models.ts` (`MODELS` + `getModelInfo`); `index.ts` uses friendly `requireKey` errors and adds `openai` entry.
+- How to verify: `npx tsc --noEmit` OK; registry lists 5 models, unknown provider/key errors are readable; `--help` works.

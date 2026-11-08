@@ -41,31 +41,39 @@ export function createAnthropic():Provider{
             })
             let text="";
             const content:ContentBlock[]=[];
-            let json = "";
+            // One JSON buffer per content block: a single shared string
+            // corrupts parallel tool calls when inputs interleave.
+            const jsonParts:string[]=[];
                          
             for await(const event of stream){
+                // Route fragments by stream index when present, else last block.
+                const idx = (event as {index?: number}).index ?? content.length - 1;
                 if(event.type === "content_block_start"){
                     const b= event.content_block;
-                    if(b.type === "text") content.push({type:"text",text:""});
+                    if(b.type === "text") { content.push({type:"text",text:""}); jsonParts.push(""); }
                     else if(b.type=== "tool_use"){
                         content.push({type:"toolCall", id:b.id, name:b.name, arguments:{}})
-                        json=""
+                        jsonParts.push("")
                     }
                 }
                 else if(event.type === "content_block_delta"){
-                    const block = content.at(-1);
+                    const block = content[idx] ?? content.at(-1);
                     if(event.delta.type==="text_delta" && block?.type==="text"){
                         block.text+=event.delta.text
                         yield{type:"text_delta", delta: event.delta.text}
                     }
                     else if(event.delta.type==="input_json_delta"){
-                        json+=event.delta.partial_json
+                        jsonParts[idx]+=event.delta.partial_json
                     }
                 }
                 else if(event.type === "content_block_stop"){
-                    const block=content.at(-1);
-                    if(block?.type==="toolCall")
-                        block.arguments=json?JSON.parse(json):{};
+                    const at = (event as {index?: number}).index ?? content.length - 1;
+                    const block=content[at];
+                    if(block?.type==="toolCall") {
+                        // Truncated or partial JSON must not crash the loop.
+                        try { block.arguments=jsonParts[at]?JSON.parse(jsonParts[at]):{}; }
+                        catch { block.arguments={}; }
+                    }
                 }
             }
             const final= await stream.finalMessage();
