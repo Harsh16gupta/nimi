@@ -5,7 +5,9 @@ import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
-import { appendMessages } from "../session/store.ts";
+import { MODELS, getModelInfo } from "../providers/models.ts";
+import { getProvider } from "../providers/index.ts";
+import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
 import { HELP_TEXT, parseBare, parseSlash } from "./slash.ts";
@@ -119,6 +121,9 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const startedRef = useRef(false);
   // Tools answered "always" skip future prompts in this session.
   const alwaysAllowed = useRef(new Set<string>());
+  // /model can switch these mid-session; history is kept.
+  const [activeProvider, setActiveProvider] = useState(provider);
+  const [activeModel, setActiveModel] = useState(model);
 
   const nextId = () => idRef.current++;
 
@@ -170,10 +175,57 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           setSession((s) => s + 1);
           return;
         }
+        if (slash.type === "model") {
+          const id = nextId();
+          if (!slash.arg) {
+            const lines = MODELS.map((m) => `  ${m.id}${m.id === activeModel ? "  ← current" : ""}`);
+            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Models (use /model <id>):\n" + lines.join("\n") }]);
+          } else {
+            const info = getModelInfo(slash.arg);
+            if (!info) {
+              setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Unknown model: ${slash.arg}  (try /model)` }]);
+            } else {
+              try {
+                setActiveProvider(getProvider(info.provider));
+                setActiveModel(info.id);
+                setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Switched to ${info.id} — history kept.` }]);
+              } catch (e) {
+                setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
+              }
+            }
+          }
+          idRef.current++;
+          return;
+        }
+        if (slash.type === "tools") {
+          const id = nextId();
+          const lines = tools.map((t) => `  ${t.name}${t.readOnly ? "  [read-only]" : "  [asks permission]"}`);
+          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Tools:\n" + lines.join("\n") }]);
+          idRef.current++;
+          return;
+        }
+        if (slash.type === "sessions") {
+          const id = nextId();
+          const ids = await listSessions();
+          const lines: string[] = [];
+          for (let i = ids.length - 1; i >= 0 && lines.length < 10; i--) {
+            const loaded = await loadSession(ids[i]!);
+            if (loaded) lines.push(`  ${loaded.info.id}  ${loaded.info.provider}/${loaded.info.model}`);
+          }
+          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: lines.length > 0 ? "Sessions (resume with --session <id>):\n" + lines.join("\n") : "No saved sessions yet." }]);
+          idRef.current++;
+          return;
+        }
+        if (slash.type === "session") {
+          const id = nextId();
+          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Session ${sessionId} — resume with: nimi --session ${sessionId}` }]);
+          idRef.current++;
+          return;
+        }
         if (slash.type === "context") {
           const id = nextId();
           const used = estimateTokens(messagesRef.current);
-          const limit = getContextLimit(model, contextLimit);
+          const limit = getContextLimit(activeModel, contextLimit);
           const text = limit
             ? `~${used} / ${limit} tokens (${Math.round((used / limit) * 100)}%) — auto-compacts at 75%`
             : `~${used} tokens (window unknown)`;
@@ -193,7 +245,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           setWorking(true);
           try {
             // In-memory only: the session file keeps the full log.
-            const result = await compactMessages(messagesRef.current, provider, model);
+            const result = await compactMessages(messagesRef.current, activeProvider, activeModel);
             if (!result.compacted) {
               setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "History is already short." }]);
             } else {
@@ -237,8 +289,8 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
 
       try {
         for await (const event of runAgent({
-          provider,
-          model,
+          provider: activeProvider,
+          model: activeModel,
           system,
           tools,
           messages: messagesRef.current,
@@ -298,7 +350,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         }
       }
     },
-    [appendText, canUseTool, contextLimit, exit, model, provider, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, sessionId, system, tools],
   );
 
   useInput((input, key) => {
@@ -331,7 +383,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
 
   return (
     <Box flexDirection="column">
-      <Header model={model} sessionId={sessionId} />
+      <Header model={activeModel} sessionId={sessionId} />
       {rows.length === 0 && (
         <Box marginTop={1}>
           <Text dimColor>

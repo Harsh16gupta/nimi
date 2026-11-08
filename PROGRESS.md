@@ -54,6 +54,11 @@
 - What changed: `AgentOptions += contextLimit?`, `AgentEvent += compacted {before, after}`; loop compacts then yields the notice; print logs one line, TUI adds a transcript row; both pass `contextLimit` through.
 - How to verify: `npx tsc --noEmit` OK; oversized history compacts first (`compacted` before `turn_end`), ends clean, history shrinks; `--help` works.
 
+## Slash essentials (model/tools/sessions/session in TUI)
+- What I learned: every new slash is just a renderer over state already in hand (registry, tools prop, store, sessionId) — except `/model`, which needs switchable provider state.
+- What changed: `slash.ts` parses `/model <id>` arg + 3 new actions; `App` holds `activeProvider/activeModel` (history kept across switches, missing-key errors shown inline) and renders the four read-only commands.
+- How to verify: `npx tsc --noEmit` OK; `/model` lists, bad id errors, `/tools` tags ro/ask, `/sessions`/`/session` print; `--help` unchanged.
+
 ## Git writes (add/commit/branch/checkout/reset, gated)
 - What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
 - What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).
