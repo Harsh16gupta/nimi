@@ -43,3 +43,8 @@
 - What I learned: print mode persisted but the TUI stayed amnesiac — same store, different lifecycle: init from loaded history, save the per-turn slice in `finally`.
 - What changed: `App += sessionId/initialMessages` (history init + `savedCount`, `appendMessages` per turn, header shows short id, resumed notice with count); `main.tsx` TUI branch creates/resumes like print mode. No Markdown, no token counter — kept simple.
 - How to verify: `npx tsc --noEmit` OK; slice-save smoke (2 msgs turn 1, +1 turn 2, no dupes); `--help` works; manual TUI run resumes.
+
+## Git writes (add/commit/branch/checkout/reset, gated)
+- What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
+- What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).
+- How to verify: `npx tsc --noEmit` OK; `git_*=ro,ro,ro,ask×5`; all 5 reject bad input without mutating; `branch list` runs; `--help` works.
