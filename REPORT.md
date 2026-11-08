@@ -89,6 +89,11 @@
 - What changed: step 2 — classic REPL records one trace across turns (lazy header on first prompt, `finish()` on `/quit`) + header tools catalog; steps 3–11 — `demo/` Vite+React site: `data/trace.js` parse/fold (`replay` with allow/deny branch, print/classic blocks, per-turn token deltas; deny injects the gate's exact message and truncates), frozen `samples/showcase.jsonl` v1 (synthetic 23-event run via the real recorder: read→gated write, compaction, 3 turns), light-first theme, controls bar (play/step/speed/output/branch/filter), turn-grouped timeline with sparklines, event-rail minimap with playhead, inspector (payload/messages/events tabs, L<n> cites, copy), terminal replay, `#print/allow/12` hash routing with keyboard.
 - How to verify: `npm run check` 0 errors (warnings/infos identical to baseline), trace fold test green (23 events, 3 turns, deny truncation + exact deny text, compaction dip 178→54), `npm run build` clean in `demo/`, trace confirmed inlined in the bundle, `--help` intact. Not browser-tested (no browser here) — needs your click-through. Deploy = one Vercel project rooted at `demo/` (auto-detects Vite).
 
+## Single-flow diagram canvas with click-to-open inspector
+- Dropped the turn lanes and event rail: the canvas is now one continuous left-to-right chain (user → LLM → tools → results → gate → summarize → answer), matching the approved mockup and how Cogent reads. Nodes are hand-built SVG with original icons; shape and accent carry meaning (oval start/end, amber gate, green done, red denied, indigo selection).
+- New `demo/src/data/flow.js` (tested: 15-node allow chain, 8-node deny chain ending at the denied gate, early-scrub prefix). No sidebar at start — clicking a node opens a floating glass inspector (payload = the node's full events, plus messages/events/terminal tabs). Print/classic toggle now drives the terminal tab. Mac top bar, floating playback pill, hash routing and keyboard unchanged.
+- Verify: `npm run build` clean in `demo/`; flow-chain node test green; `npm run check` 0 errors. Still needs your browser click-through; Vercel deploy still one manual project creation.
+
 ## Final report
 Rebuilt nimi step by step from a 4-tool loop to a Cogent-parity lightweight
 agent: 15 tools (7 read-only, 8 gated), permission gate + TUI dialog + `--yolo`,

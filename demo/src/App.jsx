@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import showcaseText from "../samples/showcase.jsonl?raw";
 import { parseTrace, replay, turnTokens } from "./data/trace.js";
 import Controls from "./components/Controls.jsx";
-import Timeline from "./components/Timeline.jsx";
-import Minimap from "./components/Minimap.jsx";
+import FlowCanvas from "./components/FlowCanvas.jsx";
 import Inspector from "./components/Inspector.jsx";
-import Terminal from "./components/Terminal.jsx";
 
 const parsed = parseTrace(showcaseText);
 const MAX = parsed.items.length - 1;
@@ -28,7 +26,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState("1×");
   const [query, setQuery] = useState("");
-  const [sel, setSel] = useState(null); // timeline step pinned in the inspector
+  const [sel, setSel] = useState(null); // flow node pinned in the inspector
   const go = (index) => setPos((p) => ({ ...p, index: Math.max(0, Math.min(MAX, index)) }));
 
   useEffect(() => {
@@ -73,12 +71,18 @@ export default function App() {
 
   return (
     <>
-      <header className="top">
-        <h1>nimi — showcase</h1>
-        <p>
-          <code>{header.prompt}</code> · {header.provider}/{header.model} · session {header.session}
-        </p>
+      <header className="topbar">
+        <span className="lights" aria-hidden="true"><i /><i /><i /></span>
+        <strong>nimi — showcase</strong>
+        <span className="task">{header.prompt}</span>
+        <span className="chip">{header.provider} / {header.model}</span>
       </header>
+      <main className="canvas-wrap">
+        <FlowCanvas view={view} header={header} deltas={DELTAS} selKey={sel?.key} onSelect={setSel} query={query} />
+      </main>
+      {sel && (
+        <Inspector view={view} parsed={parsed} sel={sel} output={pos.output} onClose={() => setSel(null)} />
+      )}
       <Controls
         pos={pos}
         setPos={setPos}
@@ -90,22 +94,6 @@ export default function App() {
         query={query}
         setQuery={setQuery}
       />
-      <div className="layout">
-        <Minimap parsed={parsed} view={view} index={pos.index} go={go} />
-        <main>
-          {view.truncated && (
-            <div className="card">
-              <p>
-                <strong>Deny branch:</strong> the write was denied, so the model got an error result here. Later steps
-                below belong to the recorded allow branch.
-              </p>
-            </div>
-          )}
-          <Timeline turns={view.turns} deltas={DELTAS} query={query} sel={sel} onSelect={setSel} />
-          <Terminal blocks={view.blocks} output={pos.output} />
-        </main>
-        <Inspector view={view} parsed={parsed} sel={sel} />
-      </div>
     </>
   );
 }
