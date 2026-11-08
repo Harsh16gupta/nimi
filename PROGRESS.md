@@ -44,6 +44,11 @@
 - What changed: `App += sessionId/initialMessages` (history init + `savedCount`, `appendMessages` per turn, header shows short id, resumed notice with count); `main.tsx` TUI branch creates/resumes like print mode. No Markdown, no token counter — kept simple.
 - How to verify: `npx tsc --noEmit` OK; slice-save smoke (2 msgs turn 1, +1 turn 2, no dupes); `--help` works; manual TUI run resumes.
 
+## Manual compaction (estimate, safe split, LLM summary)
+- What I learned: summarization preserves decisions while truncation just deletes; the cut must never orphan a `toolResult` from its assistant turn or providers reject it. `chars/4` is plenty for a threshold.
+- What changed: new `src/agent/compaction.ts` (`estimateTokens`, `getContextLimit` flag > `MODELS`, `shouldCompact` at 75%, `findSafeSplit`, `compactMessages` via current provider); TUI `/compact` + `/context`; `arg += --context-limit`; `App += contextLimit`. Auto-compact in loop deferred.
+- How to verify: `npx tsc --noEmit` OK; 1000 chars ~ 250 tokens, tiny limit triggers, summary replaces head keeping 6, orphan guard holds; `--help` shows flag.
+
 ## Git writes (add/commit/branch/checkout/reset, gated)
 - What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
 - What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).

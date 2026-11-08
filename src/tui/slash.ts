@@ -1,8 +1,10 @@
-// Minimal slash commands: /help, /clear, /quit.
+// Minimal slash commands: /help, /clear, /compact, /context, /quit.
 
 export type SlashAction =
   | { type: "help" }
   | { type: "clear" }
+  | { type: "compact" }
+  | { type: "context" }
   | { type: "quit" }
   | { type: "unknown"; name: string };
 
@@ -26,12 +28,16 @@ export function parseBare(input: string): SlashAction | null {
 function nameToAction(name: string): SlashAction {
   if (name === "help") return { type: "help" };
   if (name === "clear") return { type: "clear" };
+  if (name === "compact") return { type: "compact" };
+  if (name === "context") return { type: "context" };
   if (name === "quit" || name === "exit" || name === "q") return { type: "quit" };
   return { type: "unknown", name: name || "/" };
 }
 
 export const HELP_TEXT =
   "Commands:\n" +
-  "  /help   Show this help\n" +
-  "  /clear  Clear the transcript\n" +
-  "  /quit   Exit nimi";
+  "  /help     Show this help\n" +
+  "  /clear    Clear the transcript\n" +
+  "  /compact  Summarize old history to free context\n" +
+  "  /context  Show token usage vs the window\n" +
+  "  /quit     Exit nimi";

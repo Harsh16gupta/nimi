@@ -4,6 +4,7 @@ import { Box, Static, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import { runAgent } from "../agent.ts";
+import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
 import { appendMessages } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
@@ -30,6 +31,7 @@ type AppProps = {
   yolo?: boolean;
   sessionId: string;
   initialMessages: Message[];
+  contextLimit?: number;
 };
 
 const DIVIDER_MAX = 80;
@@ -97,7 +99,7 @@ function ToolRow({ row }: { row: Extract<Row, { kind: "tool" }> }) {
   );
 }
 
-export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages }: AppProps) {
+export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages, contextLimit }: AppProps) {
   const { exit } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState("");
@@ -166,6 +168,46 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           textIdRef.current = null;
           setRows([]);
           setSession((s) => s + 1);
+          return;
+        }
+        if (slash.type === "context") {
+          const id = nextId();
+          const used = estimateTokens(messagesRef.current);
+          const limit = getContextLimit(model, contextLimit);
+          const text = limit
+            ? `~${used} / ${limit} tokens (${Math.round((used / limit) * 100)}%) — auto-compacts at 75%`
+            : `~${used} tokens (window unknown)`;
+          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text }]);
+          idRef.current++;
+          return;
+        }
+        if (slash.type === "compact") {
+          if (workingRef.current) return;
+          const id = nextId();
+          if (messagesRef.current.length === 0) {
+            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Nothing to compact." }]);
+            idRef.current++;
+            return;
+          }
+          workingRef.current = true;
+          setWorking(true);
+          try {
+            // In-memory only: the session file keeps the full log.
+            const result = await compactMessages(messagesRef.current, provider, model);
+            if (!result.compacted) {
+              setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "History is already short." }]);
+            } else {
+              messagesRef.current = result.messages;
+              textIdRef.current = null;
+              setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Compacted. Summary:\n" + result.summary }]);
+            }
+          } catch (e) {
+            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Compact failed: " + (e instanceof Error ? e.message : String(e)) }]);
+          } finally {
+            workingRef.current = false;
+            setWorking(false);
+          }
+          idRef.current++;
           return;
         }
         const id = nextId();
@@ -251,7 +293,7 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         }
       }
     },
-    [appendText, canUseTool, exit, model, provider, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, exit, model, provider, sessionId, system, tools],
   );
 
   useInput((input, key) => {

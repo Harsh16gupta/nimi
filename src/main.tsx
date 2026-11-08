@@ -138,5 +138,5 @@ if (args.session) {
 }
 
 render(
-  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} />,
+  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} contextLimit={args.contextLimit} />,
 );

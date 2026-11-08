@@ -4,6 +4,7 @@ export interface CliArgs {
 	model?: string; // --model: override the provider's default model
 	session?: string; // --session: resume a saved session id
 	listSessions: boolean; // --list-sessions: print saved sessions and exit
+	contextLimit?: number; // --context-limit: override the model's context window
 	print: boolean; // --print: force one-shot print mode even in a TTY
 	yolo: boolean; // --yolo: run all tools without asking
 	version: boolean; // -v / --version
@@ -60,6 +61,12 @@ export function parseArgs(argv: string[]): CliArgs {
 			case "--list-sessions":
 				args.listSessions = true;
 				break;
+			case "--context-limit": {
+				const n = Number(value());
+				if (!Number.isInteger(n) || n <= 0) throw new Error("--context-limit needs a positive integer");
+				args.contextLimit = n;
+				break;
+			}
 			case "--print":
 				args.print = true;
 				break;
@@ -107,6 +114,7 @@ OPTIONS
       --model <id>       Model ID (defaults to the provider's model)
       --session <id>     Resume a saved session
       --list-sessions    Print saved sessions, then exit
+      --context-limit <n> Override the model's context window
       --print            Force one-shot print mode even in a TTY
       --yolo             Run all tools without asking
   -v, --version          Show version
