@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { runAgent } from "./agent.ts";
 import { parseArgs, printHelp, printVersion } from "./cli/arg.ts";
 import { buildSystemPrompt } from "./config/system-prompt.ts";
+import { loadSettings } from "./config/settings.ts";
 import { allowAll, createPromptPermission } from "./permissions.ts";
 import { getProvider } from "./providers/index.ts";
 import { appendEntry, appendMessages, listSessions, loadSession, newSessionId } from "./session/store.ts";
@@ -32,9 +33,11 @@ if (args.version) {
   process.exit(0);
 }
 
-const provider = getProvider(args.provider);
-const model = args.model ?? provider.defaultModel;
-const system = await buildSystemPrompt();
+const settings = await loadSettings();
+// Precedence: CLI flag > project settings > global settings > env > default.
+const provider = getProvider(args.provider ?? settings.provider ?? "meta");
+const model = args.model ?? settings.model ?? provider.defaultModel;
+const system = await buildSystemPrompt(settings.systemPromptExtra);
 
 // List saved sessions (id + date + first prompt) newest first, then exit.
 if (args.listSessions) {
@@ -57,8 +60,8 @@ if (args.listSessions) {
 }
 
 // Piped / non-interactive: keep the old one-shot behavior so scripts
-// and non-TTY environments still work. Needs an explicit prompt.
-if (!process.stdin.isTTY || !process.stdout.isTTY) {
+// and non-TTY environments still work. --print forces it in a TTY too.
+if (args.print || !process.stdin.isTTY || !process.stdout.isTTY) {
   if (!args.prompt) {
     console.error('No prompt given. Run "nimi --help" for usage.');
     process.exit(1);
@@ -78,7 +81,7 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
   } else {
     sessionId = newSessionId();
     messages = [{ role: "user", content: args.prompt }];
-    await appendEntry(sessionId, { type: "session_info", id: sessionId, created_at: new Date().toISOString(), model, provider: args.provider });
+    await appendEntry(sessionId, { type: "session_info", id: sessionId, created_at: new Date().toISOString(), model, provider: provider.name });
   }
   console.error(`Session ${sessionId} — resume with: --session ${sessionId}`);
   const before = messages.length;
@@ -131,7 +134,7 @@ if (args.session) {
 } else {
   tuiSessionId = newSessionId();
   tuiMessages = [];
-  await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: args.provider });
+  await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: provider.name });
 }
 
 render(

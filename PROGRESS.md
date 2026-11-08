@@ -48,3 +48,8 @@
 - What I learned: one tool that can delete must always ask — so `git_branch` stays writable even though `list` is harmless. Validation throws before spawn, so bad input never reaches git.
 - What changed: 5 tools in `src/tools/git.ts` reusing `runGit` (array args, 30s kill, truncate); all writable so the gate prompts; registered in `index.ts` (15 tools total).
 - How to verify: `npx tsc --noEmit` OK; `git_*=ro,ro,ro,ask×5`; all 5 reject bad input without mutating; `branch list` runs; `--help` works.
+
+## Settings cascade (global < project < env, flags win)
+- What I learned: hardcoding `meta` meant every other provider needed a flag; layered files let machine and repo defaults stick while env/flags override per run.
+- What changed: new `src/config/settings.ts` (`~/.nimi` < `.nimi` < `NIMI_PROVIDER/MODEL`, missing/broken file = `{}`); `CliArgs.provider` optional with default resolved in `main.tsx`; `+= --print` (forces one-shot even in TTY); session records use resolved provider name. `--classic/--context-limit` deferred to their consumer steps.
+- How to verify: `npx tsc --noEmit` OK; empty args parse, settings load, `NIMI_PROVIDER` overrides; `--help` shows `--print`; `--list-sessions` works.

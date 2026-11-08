@@ -1,9 +1,10 @@
 export interface CliArgs {
 	prompt?: string; // -p / --prompt: the text to send to the model
-	provider: string; // -z / --provider: which provider to use
+	provider?: string; // -z / --provider: which provider to use
 	model?: string; // --model: override the provider's default model
 	session?: string; // --session: resume a saved session id
 	listSessions: boolean; // --list-sessions: print saved sessions and exit
+	print: boolean; // --print: force one-shot print mode even in a TTY
 	yolo: boolean; // --yolo: run all tools without asking
 	version: boolean; // -v / --version
 	help: boolean; // -h / --help
@@ -13,8 +14,9 @@ const DEFAULT_PROVIDER = "meta";
 
 export function parseArgs(argv: string[]): CliArgs {
 	const args: CliArgs = {
-		provider: DEFAULT_PROVIDER,
+		provider: undefined,
 		listSessions: false,
+		print: false,
 		yolo: false,
 		version: false,
 		help: false,
@@ -57,6 +59,9 @@ export function parseArgs(argv: string[]): CliArgs {
 				break;
 			case "--list-sessions":
 				args.listSessions = true;
+				break;
+			case "--print":
+				args.print = true;
 				break;
 			case "--yolo":
 				args.yolo = true;
@@ -102,6 +107,7 @@ OPTIONS
       --model <id>       Model ID (defaults to the provider's model)
       --session <id>     Resume a saved session
       --list-sessions    Print saved sessions, then exit
+      --print            Force one-shot print mode even in a TTY
       --yolo             Run all tools without asking
   -v, --version          Show version
   -h, --help             Show this help
