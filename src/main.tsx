@@ -116,6 +116,24 @@ if (!process.stdin.isTTY || !process.stdout.isTTY) {
 const { render } = await import("ink");
 const { default: App } = await import("./tui/App.tsx");
 
+// TUI sessions persist like print mode: resume loads history,
+// fresh runs store session_info up front, each turn appends after.
+let tuiMessages: Message[];
+let tuiSessionId: string;
+if (args.session) {
+  const loaded = await loadSession(args.session);
+  if (!loaded) {
+    console.error(`No such session: ${args.session}. Run "--list-sessions" to see saved ids.`);
+    process.exit(1);
+  }
+  tuiMessages = loaded.messages;
+  tuiSessionId = loaded.info.id;
+} else {
+  tuiSessionId = newSessionId();
+  tuiMessages = [];
+  await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: args.provider });
+}
+
 render(
-  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} />,
+  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} />,
 );

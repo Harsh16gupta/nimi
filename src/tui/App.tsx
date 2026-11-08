@@ -4,6 +4,7 @@ import { Box, Static, Text, useApp, useInput } from "ink";
 import TextInput from "ink-text-input";
 import Spinner from "ink-spinner";
 import { runAgent } from "../agent.ts";
+import { appendMessages } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
 import { HELP_TEXT, parseBare, parseSlash } from "./slash.ts";
@@ -27,11 +28,13 @@ type AppProps = {
   tools: Tool[];
   initialPrompt?: string;
   yolo?: boolean;
+  sessionId: string;
+  initialMessages: Message[];
 };
 
 const DIVIDER_MAX = 80;
 
-function Header({ model }: { model: string }) {
+function Header({ model, sessionId }: { model: string; sessionId: string }) {
   const width = process.stdout.columns ?? 60;
   const count = Math.max(20, Math.min(width - 2, DIVIDER_MAX));
   return (
@@ -40,7 +43,7 @@ function Header({ model }: { model: string }) {
         <Text bold>nimi</Text>
         <Text dimColor>
           {" "}
-          · {model} · {process.cwd()}
+          · {model} · {process.cwd()} · {sessionId.slice(-6)}
         </Text>
       </Box>
       <Text dimColor>{"─".repeat(count)}</Text>
@@ -94,7 +97,7 @@ function ToolRow({ row }: { row: Extract<Row, { kind: "tool" }> }) {
   );
 }
 
-export default function App({ provider, model, system, tools, initialPrompt, yolo }: AppProps) {
+export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages }: AppProps) {
   const { exit } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState("");
@@ -105,7 +108,9 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const [pending, setPending] = useState<{ name: string; input: Record<string, unknown>; resolve: (v: "yes" | "always" | "no") => void } | null>(null);
 
   const idRef = useRef(1);
-  const messagesRef = useRef<Message[]>([]);
+  // History starts from the resumed session; savedCount tracks what is on disk.
+  const messagesRef = useRef<Message[]>([...initialMessages]);
+  const savedCount = useRef(initialMessages.length);
   const abortRef = useRef<AbortController | null>(null);
   const workingRef = useRef(false);
   const textIdRef = useRef<number | null>(null);
@@ -236,9 +241,17 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         abortRef.current = null;
         workingRef.current = false;
         setWorking(false);
+        // Persist only what this turn added; runAgent mutates messages in place.
+        const fresh = messagesRef.current.slice(savedCount.current);
+        if (fresh.length > 0) {
+          savedCount.current = messagesRef.current.length;
+          void appendMessages(sessionId, fresh).catch((e) => {
+            setError(e instanceof Error ? e.message : String(e));
+          });
+        }
       }
     },
-    [appendText, canUseTool, exit, model, provider, system, tools],
+    [appendText, canUseTool, exit, model, provider, sessionId, system, tools],
   );
 
   useInput((input, key) => {
@@ -271,10 +284,14 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
 
   return (
     <Box flexDirection="column">
-      <Header model={model} />
+      <Header model={model} sessionId={sessionId} />
       {rows.length === 0 && (
         <Box marginTop={1}>
-          <Text dimColor>Type a message, or /help.</Text>
+          <Text dimColor>
+            {initialMessages.length > 0
+              ? `Resumed session — ${initialMessages.length} messages restored. Type, or /help.`
+              : "Type a message, or /help."}
+          </Text>
         </Box>
       )}
       <Static key={session} items={settled}>

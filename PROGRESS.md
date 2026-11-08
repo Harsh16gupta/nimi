@@ -38,3 +38,8 @@
 - What I learned: memory-only history dies on exit; append-only JSONL (one entry per line) survives crashes and resumes by re-reading lines. Save only what the run added (`messages.slice(before)`) so resume never duplicates.
 - What changed: new `src/session/store.ts` (`session_info` + `message` entries under `.nimi/sessions/`, tolerant load); `arg.ts` adds `--session/--list-sessions`; print-mode creates/resumes/saves and prints the resume id to stderr. TUI persist deferred.
 - How to verify: `npx tsc --noEmit` OK; offline round-trip (save 1 msg, load 1 msg, missing -> null, listed); `--list-sessions` prints newest-first; `--help` works.
+
+## TUI sessions (resume + save per turn, simple header)
+- What I learned: print mode persisted but the TUI stayed amnesiac — same store, different lifecycle: init from loaded history, save the per-turn slice in `finally`.
+- What changed: `App += sessionId/initialMessages` (history init + `savedCount`, `appendMessages` per turn, header shows short id, resumed notice with count); `main.tsx` TUI branch creates/resumes like print mode. No Markdown, no token counter — kept simple.
+- How to verify: `npx tsc --noEmit` OK; slice-save smoke (2 msgs turn 1, +1 turn 2, no dupes); `--help` works; manual TUI run resumes.
