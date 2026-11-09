@@ -1,7 +1,16 @@
 {
   "name": "nimi",
   "version": "1.0.0",
-  "description": "",
+  "description": "Minimal coding agent: a language model with controlled access to your files, shell, and git.",
+  "license": "ISC",
+  "author": "Harsh16gupta",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Harsh16gupta/pi-basic-handon.git"
+  },
+  "keywords": ["ai", "agent", "coding", "cli", "llm"],
+  "engines": { "node": ">=22" },
+  "files": ["bin/", "src/", "readme.md", "LICENSE"],
   "main": "index.js",
   "scripts": {
     "check": "biome lint src && npx tsc --noEmit",
@@ -19,13 +28,13 @@
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "openai": "^7.25.0",
-    "react": "^19.3.1"
+    "react": "^19.3.1",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
-    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },
