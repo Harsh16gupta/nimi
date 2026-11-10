@@ -1,4 +1,6 @@
 // Playback timeline: turns, steps, speed, and run metadata.
+// Step ticks are plain buttons in a group (not a slider), so keyboard focus
+// and Space/arrow shortcuts keep working without conflicting semantics.
 import {
   SegmentedControl,
   SegmentedControlItem,
@@ -12,14 +14,7 @@ export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view
 
   return (
     <div className="nimi-timeline">
-      <div
-        className="nimi-timeline-track"
-        role="slider"
-        aria-label="Execution timeline"
-        aria-valuemin={1}
-        aria-valuemax={max + 1}
-        aria-valuenow={pos.index + 1}
-      >
+      <div className="nimi-timeline-track" role="group" aria-label="Execution timeline">
         {view.turns.map((turn) => (
           <div key={turn.n} className="nimi-timeline-turn">
             <span className="nimi-timeline-turn-label">Turn {turn.n}</span>
@@ -27,12 +22,11 @@ export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view
               {turn.steps.map((s) => {
                 const idx = s.itemIndex ?? s.key;
                 const isCurrent = idx === pos.index;
-                const isPast = idx < pos.index;
                 const isTruncated = pos.branch === "deny" && idx > 13;
                 const isDenyGate = pos.branch === "deny" && idx === 13;
                 let cls = "nimi-step-block";
                 if (isCurrent) cls += " current";
-                else if (isPast) cls += " past";
+                else if (idx < pos.index) cls += " past";
                 if (isTruncated) cls += " truncated";
                 if (isDenyGate) cls += " denied-gate";
                 return (
@@ -42,7 +36,8 @@ export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view
                     className={cls}
                     onClick={() => go(idx)}
                     title={`Step ${idx + 1} of ${max + 1}`}
-                    aria-label={`Jump to step ${idx + 1}`}
+                    aria-label={`Jump to step ${idx + 1} of ${max + 1}${isDenyGate ? " (permission gate)" : ""}`}
+                    aria-current={isCurrent ? "step" : undefined}
                   />
                 );
               })}
@@ -67,6 +62,9 @@ export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view
             truncated
           </Text>
         )}
+        <Text type="label" color="secondary" className="nimi-mono nimi-timeline-hint">
+          space play · ←/→ step
+        </Text>
       </div>
     </div>
   );

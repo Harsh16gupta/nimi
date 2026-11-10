@@ -1,12 +1,14 @@
-// Product navigation shell.
-// Visible on every page; collapses to a minimal bar on small screens.
-import { TopNav } from "@astryxdesign/core/TopNav";
-import { Button } from "@astryxdesign/core/Button";
+// Shared product navigation shell.
+// Two primary destinations (Home, Playground) plus quiet external links.
+// Secondary links collapse into the footer on small screens via CSS.
 import { Icon } from "@astryxdesign/core/Icon";
+import { TopNav } from "@astryxdesign/core/TopNav";
+
+const GITHUB_URL = "https://github.com/Harsh16gupta/nimi";
+const NPM_URL = "https://www.npmjs.com/package/nimi-code";
 
 export default function Shell({ currentPath }) {
   const isPlayground = currentPath === "/playground" || currentPath.startsWith("/playground/");
-  const isExamples = currentPath === "/examples";
   const isLanding = currentPath === "/";
 
   return (
@@ -14,8 +16,7 @@ export default function Shell({ currentPath }) {
       label="Nimi Code"
       heading={
         <a href="#/" className="nimi-brand" aria-label="Nimi Code home">
-          <span className="nimi-brand-mark">N</span>
-          nimi
+          <img src="./nimi-logo-transparent.png" alt="Nimi" className="nimi-brand-logo" />
         </a>
       }
       startContent={
@@ -34,25 +35,27 @@ export default function Shell({ currentPath }) {
           >
             Playground
           </a>
-          <a
-            href="#/examples"
-            className={`nimi-nav-link${isExamples ? " is-active" : ""}`}
-            aria-current={isExamples ? "page" : undefined}
-          >
-            Examples
-          </a>
         </>
       }
       endContent={
-        <Button
-          label={isPlayground ? "Explore Examples" : "Open Playground"}
-          variant="primary"
-          size="sm"
-          endContent={<Icon icon="arrowUp" size="sm" />}
-          onClick={() => {
-            window.location.hash = isPlayground ? "#/examples" : "#/playground";
-          }}
-        />
+        <span className="nimi-header-actions">
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="nimi-nav-link nimi-nav-external"
+          >
+            GitHub <Icon icon="externalLink" size="xsm" />
+          </a>
+          <a
+            href={NPM_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="nimi-nav-link nimi-nav-external"
+          >
+            npm <Icon icon="externalLink" size="xsm" />
+          </a>
+        </span>
       }
     />
   );

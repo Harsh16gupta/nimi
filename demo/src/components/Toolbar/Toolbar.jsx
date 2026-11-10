@@ -1,4 +1,6 @@
-// Playground toolbar: transport controls, execution mode, write permission.
+// Playground control row: transport, output lens, and replay permission branch.
+// The branch control only switches the replay fold — it never touches a live
+// machine. That limitation is stated in visible text, not just a tooltip.
 import { Button } from "@astryxdesign/core/Button";
 import { IconButton } from "@astryxdesign/core/IconButton";
 import { Icon } from "@astryxdesign/core/Icon";
@@ -16,17 +18,11 @@ export default function Toolbar({
   onGo,
   onOutputChange,
   onBranchChange,
-  header,
 }) {
-  function shortModel(model) {
-    if (!model) return "muse-spark";
-    return model.replace(/-\d.*$/, "");
-  }
-
   return (
-    <div className="nimi-toolbar" role="toolbar" aria-label="Execution controls">
-      <div className="nimi-toolbar-group">
-        <Text type="label" color="secondary" className="nimi-mono">
+    <div className="nimi-toolbar" role="toolbar" aria-label="Replay controls">
+      <div className="nimi-toolbar-group" role="group" aria-label="Playback transport">
+        <Text type="label" color="secondary" className="nimi-mono" aria-live="off">
           {pos.index + 1} / {max + 1}
         </Text>
         <IconButton
@@ -64,9 +60,12 @@ export default function Toolbar({
 
       <div className="nimi-toolbar-spacer" />
 
-      <div className="nimi-toolbar-group">
+      <div className="nimi-toolbar-group nimi-toolbar-labeled">
+        <Text type="label" color="secondary" className="nimi-toolbar-caption">
+          Lens
+        </Text>
         <SegmentedControl
-          label="Execution mode"
+          label="Output lens"
           value={pos.output}
           onChange={onOutputChange}
           size="sm"
@@ -75,9 +74,16 @@ export default function Toolbar({
           <SegmentedControlItem value="tui" label="TUI" />
           <SegmentedControlItem value="classic" label="Classic" />
         </SegmentedControl>
-        <div className="nimi-toolbar-divider" />
+      </div>
+
+      <div className="nimi-toolbar-divider" />
+
+      <div className="nimi-toolbar-group nimi-toolbar-labeled">
+        <Text type="label" color="secondary" className="nimi-toolbar-caption">
+          Replay branch
+        </Text>
         <SegmentedControl
-          label="Write permission"
+          label="Replay permission branch (simulated)"
           value={pos.branch}
           onChange={onBranchChange}
           size="sm"
@@ -89,14 +95,9 @@ export default function Toolbar({
 
       <div className="nimi-toolbar-spacer" />
 
-      <div className="nimi-toolbar-group">
-        <Text type="code" color="secondary" title={`${header.provider} / ${header.model}`}>
-          {header.provider} / {shortModel(header.model)}
-        </Text>
-        <Text type="label" color="secondary" className="nimi-mono">
-          ←/→ step · space play
-        </Text>
-      </div>
+      <Text type="label" color="secondary" className="nimi-toolbar-note">
+        Classic shortens previews · TUI marks the Ink node in the graph
+      </Text>
     </div>
   );
 }

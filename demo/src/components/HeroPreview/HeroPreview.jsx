@@ -48,7 +48,7 @@ function computeEdgePoints(fromNode, toNode) {
   return { d: `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}` };
 }
 
-export default function HeroPreview() {
+export default function HeroPreview({ viewBox = "0 0 1585 510", legend = true }) {
   const nodeMap = Object.fromEntries(ARCH_NODES.map((n) => [n.id, n]));
   const activeEdges = new Set([
     "e-mode-agent",
@@ -61,7 +61,7 @@ export default function HeroPreview() {
 
   return (
     <div className="nimi-hero-preview-inner">
-      <svg viewBox="0 0 1585 510" className="nimi-canvas-svg" role="img" aria-label="Nimi architecture preview">
+      <svg viewBox={viewBox} className="nimi-canvas-svg" role="img" aria-label="Nimi architecture preview">
         <defs>
           <marker id="hp-arrow-dim" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
             <path
@@ -104,7 +104,7 @@ export default function HeroPreview() {
               fontSize="9"
               fontFamily="var(--font-family-code)"
               letterSpacing="0.09em"
-              fill="var(--color-text-tertiary)"
+              fill="var(--color-text-secondary)"
             >
               {z.label}
             </text>
@@ -118,16 +118,14 @@ export default function HeroPreview() {
           const { d } = computeEdgePoints(fromNode, toNode);
           const isHot = activeEdges.has(edge.id);
           return (
-            <g key={edge.id}>
-              {isHot && <path d={d} fill="none" stroke="var(--color-accent)" strokeWidth="4.5" strokeOpacity="0.12" />}
-              <path
-                d={d}
-                fill="none"
-                stroke={isHot ? "var(--color-accent)" : "var(--nimi-graph-edge)"}
-                strokeWidth={isHot ? "1.65" : "1.15"}
-                markerEnd={isHot ? "url(#hp-arrow-hot)" : "url(#hp-arrow-dim)"}
-              />
-            </g>
+            <path
+              key={edge.id}
+              d={d}
+              fill="none"
+              stroke={isHot ? "var(--color-accent)" : "var(--nimi-graph-edge)"}
+              strokeWidth={isHot ? "1.65" : "1.15"}
+              markerEnd={isHot ? "url(#hp-arrow-hot)" : "url(#hp-arrow-dim)"}
+            />
           );
         })}
 
@@ -171,27 +169,16 @@ export default function HeroPreview() {
         })}
       </svg>
 
-      <div className="nimi-canvas-float-bl" style={{ bottom: 48 }}>
-        {SUBSYSTEMS.map((s) => (
-          <span
-            key={s.id}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "4px 10px",
-              borderRadius: 5,
-              border: "1px solid var(--color-border)",
-              background: "var(--nimi-panel-elevated)",
-              fontSize: "var(--font-size-xs)",
-              color: "var(--color-text-secondary)",
-            }}
-          >
-            <span className="nimi-canvas-legend-dot" style={{ background: getNodeColor(s.id) }} />
-            {s.label}
-          </span>
-        ))}
-      </div>
+      {legend && (
+        <div className="nimi-preview-legend">
+          {SUBSYSTEMS.map((s) => (
+            <span key={s.id} className="nimi-preview-legend-chip">
+              <span className="nimi-canvas-legend-dot" style={{ background: getNodeColor(s.id) }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

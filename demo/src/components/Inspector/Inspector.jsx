@@ -3,9 +3,7 @@
 // technical detail accessible: payload, source, context, events, stdout.
 import { useState } from "react";
 import { Banner } from "@astryxdesign/core/Banner";
-import { Button } from "@astryxdesign/core/Button";
 import { CodeBlock } from "@astryxdesign/core/CodeBlock";
-import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
 import { List, ListItem } from "@astryxdesign/core/List";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
@@ -122,9 +120,9 @@ export default function Inspector({
   stepNum,
   totalSteps,
   output,
+  uiMode,
   branch,
   pinnedNodeId,
-  onPlay,
 }) {
   const [tab, setTab] = useState("summary");
 
@@ -143,6 +141,10 @@ export default function Inspector({
   const sessionLines = formatSessionJsonlLines(parsed.header, messagesList);
   const snapTokens = estimateTokens(messagesList);
   const stdout = terminalText(view.blocks);
+  // Terminal text is identical for the print and TUI lenses; only Classic
+  // shortens tool previews. Label the lens honestly.
+  const stdoutTitle = output === "classic" ? "classic stdout" : "print stdout";
+  const tuiNote = uiMode === "tui" && output !== "classic";
 
   // Friendly labels for the default view.
   const friendlyPhase =
@@ -172,7 +174,7 @@ export default function Inspector({
         <Banner
           status="warning"
           title={`Write denied — ${view.denied.name}`}
-          description="The permission gate stopped this branch. Switch back to Allow to see the full run."
+          description="The permission gate stopped this replay branch. Allow / Deny only switches the sample replay — it does not control a live machine."
         />
       )}
 
@@ -208,12 +210,10 @@ export default function Inspector({
         </div>
 
         <TabList value={tab} onChange={setTab} size="sm" role="tablist" hasDivider>
-          <Tab value="summary" label="Summary" panelId="inspector-panel-summary" />
-          <Tab value="payload" label="Payload" panelId="inspector-panel-payload" />
-          <Tab value="source" label="Source" panelId="inspector-panel-source" />
-          <Tab value="messages" label={`Context ${messagesList.length}`} panelId="inspector-panel-messages" />
+          <Tab value="summary" label="Overview" panelId="inspector-panel-summary" />
           <Tab value="events" label={`${view.events.length} Events`} panelId="inspector-panel-events" />
-          <Tab value="terminal" label="Stdout" panelId="inspector-panel-terminal" />
+          <Tab value="messages" label={`Context ${messagesList.length}`} panelId="inspector-panel-messages" />
+          <Tab value="source" label="Source" panelId="inspector-panel-source" />
         </TabList>
 
         <div id={`inspector-panel-${tab}`}>
@@ -250,8 +250,8 @@ export default function Inspector({
               >
                 <SummaryTile
                   icon="info"
-                  label="Mode"
-                  value={output === "print" ? "One-shot" : output === "classic" ? "Classic REPL" : "TUI"}
+                  label="Lens"
+                  value={output === "print" ? (uiMode === "tui" ? "TUI · same stream" : "Print · one-shot") : "Classic REPL"}
                 />
                 <SummaryTile
                   icon="success"
@@ -265,19 +265,17 @@ export default function Inspector({
             </div>
           )}
 
-          {tab === "payload" && (
-            <CodeBlock
-              code={sessionLines.join("\n")}
-              language="json"
-              title={`session ${(parsed.header?.session ?? "showcase-v1").toUpperCase()}.jsonl`}
-              size="sm"
-              width="100%"
-              maxHeight={420}
-            />
-          )}
-
-          {tab === "source" && (
-            <CodeBlock code={codeSnippet} language="ts" title={fileRef} size="sm" width="100%" maxHeight={420} />
+          {tab === "events" && (
+            <List density="compact">
+              {view.events.map((s) => (
+                <ListItem
+                  key={s.key}
+                  isSelected={s.line === stepInfo.traceLine}
+                  label={`${s.event.type}${s.event.name ? ` (${s.event.name})` : ""}`}
+                  description={`#${s.event.i ?? s.key} · L${s.line}`}
+                />
+              ))}
+            </List>
           )}
 
           {tab === "messages" && (
@@ -305,37 +303,52 @@ export default function Inspector({
             </div>
           )}
 
-          {tab === "events" && (
-            <List density="compact">
-              {view.events.map((s) => (
-                <ListItem
-                  key={s.key}
-                  isSelected={s.line === stepInfo.traceLine}
-                  label={`${s.event.type}${s.event.name ? ` (${s.event.name})` : ""}`}
-                  description={`#${s.event.i ?? s.key} · L${s.line}`}
-                />
-              ))}
-            </List>
+          {tab === "source" && (
+            <CodeBlock code={codeSnippet} language="ts" title={fileRef} size="sm" width="100%" maxHeight={420} />
           )}
-
-          {tab === "terminal" &&
-            (stdout.length > 0 ? (
-              <CodeBlock
-                code={stdout}
-                language="plaintext"
-                title={`${output} stdout`}
-                size="sm"
-                width="100%"
-                maxHeight={420}
-              />
-            ) : (
-              <EmptyState
-                title="No output yet"
-                description="Step forward or press play to stream this run."
-                actions={onPlay ? <Button label="Play" size="sm" variant="primary" onClick={onPlay} /> : undefined}
-              />
-            ))}
         </div>
+
+        <details className="nimi-advanced">
+          <summary>
+            <Text type="label" weight="semibold">
+              Advanced: trace payload & stdout
+            </Text>
+            <Text type="label" color="secondary">
+              Raw JSONL session lines and terminal output
+            </Text>
+          </summary>
+          <div className="nimi-advanced-body">
+            <CodeBlock
+              code={sessionLines.join("\n")}
+              language="json"
+              title={`session ${(parsed.header?.session ?? "showcase-v1").toUpperCase()}.jsonl`}
+              size="sm"
+              width="100%"
+              maxHeight={420}
+            />
+            {stdout.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-2)" }}>
+                <CodeBlock
+                  code={stdout}
+                  language="plaintext"
+                  title={stdoutTitle}
+                  size="sm"
+                  width="100%"
+                  maxHeight={420}
+                />
+                {tuiNote && (
+                  <Text type="label" color="secondary">
+                    TUI renders this same stream; the graph highlights the Ink renderer node instead.
+                  </Text>
+                )}
+              </div>
+            ) : (
+              <Text type="label" color="secondary">
+                No stdout yet — step forward or press play.
+              </Text>
+            )}
+          </div>
+        </details>
       </div>
     </div>
   );

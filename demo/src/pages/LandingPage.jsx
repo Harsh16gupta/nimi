@@ -1,17 +1,21 @@
-// Landing page: explains Nimi Code and routes into the product.
+// Landing page: explains Nimi Code and routes into the sample replay.
+// One H1, one copyable install command, one playground CTA, a framed product
+// preview, three differentiators, a four-step workflow, and a compact footer.
+import { useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import { Heading } from "@astryxdesign/core/Heading";
-import { Text } from "@astryxdesign/core/Text";
 import { Icon } from "@astryxdesign/core/Icon";
 import HeroPreview from "../components/HeroPreview/HeroPreview.jsx";
+
+const INSTALL_CMD = "npm install -g nimi-code";
+const GITHUB_URL = "https://github.com/Harsh16gupta/nimi";
+const NPM_URL = "https://www.npmjs.com/package/nimi-code";
 
 export default function LandingPage() {
   return (
     <main className="nimi-landing">
       <Hero />
       <Preview />
-      <HowItWorks />
-      <Capabilities />
       <FinalCta />
       <Footer />
     </main>
@@ -19,44 +23,88 @@ export default function LandingPage() {
 }
 
 function Hero() {
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  const copyInstall = async () => {
+    setCopyFailed(false);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(INSTALL_CMD);
+      } else {
+        throw new Error("no clipboard API");
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Fallback for contexts without async clipboard access.
+      try {
+        const area = document.createElement("textarea");
+        area.value = INSTALL_CMD;
+        area.setAttribute("readonly", "");
+        area.style.position = "absolute";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(area);
+        if (!ok) throw new Error("execCommand failed");
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      } catch {
+        setCopyFailed(true);
+      }
+    }
+  };
+
   return (
-    <section className="nimi-hero">
-      <div className="nimi-hero-bg" />
-      <div className="nimi-hero-grid" />
-      <div className="nimi-hero-content">
+    <section className="nimi-hero" aria-labelledby="nimi-hero-title">
+      <div className="nimi-hero-bg" aria-hidden />
+      <div className="nimi-hero-grid" aria-hidden />
+      <div className="nimi-hero-content" pt-50>
         <span className="nimi-eyebrow">
-          <Icon icon="check" size="xsm" color="success" />
+          <Icon icon="check" size="xsm" />
           Open-source coding agent
         </span>
-        <h1 className="nimi-headline">
-          See exactly what your
-          <br />
-          coding agent is doing
+        <h1 className="nimi-headline" id="nimi-hero-title">
+          A lightweight coding agent you can actually inspect.
         </h1>
         <p className="nimi-lead">
-          Nimi Code is a minimal terminal coding agent that reads, reasons, and acts on your files, shell,
-          and git. The web playground visualizes every step of an execution so you can understand,
-          debug, and trust the loop.
+          Nimi is a minimal terminal harness: point it at your repo, give it a task, and it
+          coordinates a model you configure with read, write, shell, and git tools. Every run is
+          recorded as a JSONL trace you can replay. The browser playground below replays one bundled
+          sample — no API key needed for the demo.
         </p>
         <div className="nimi-hero-actions">
           <Button
-            label="Open Playground"
+            label={copied ? "Copied!" : "Copy install command"}
             variant="primary"
+            size="lg"
+            endContent={<Icon icon="copy" size="sm" />}
+            onClick={copyInstall}
+          />
+          <Button
+            label="Open Playground"
+            variant="secondary"
             size="lg"
             endContent={<Icon icon="arrowUp" size="sm" />}
             onClick={() => {
               window.location.hash = "#/playground";
             }}
           />
-          <Button
-            label="Explore Examples"
-            variant="secondary"
-            size="lg"
-            onClick={() => {
-              window.location.hash = "#/examples";
-            }}
-          />
         </div>
+        <p className="nimi-install-row">
+          <code className="nimi-install-cmd">{INSTALL_CMD}</code>
+          <button type="button" className="nimi-install-copy" onClick={copyInstall} title="Copy install command">
+            <Icon icon="copy" size="xsm" />
+            <span className="nimi-visually-hidden">Copy install command</span>
+          </button>
+        </p>
+        {copyFailed && (
+          <p className="nimi-install-fallback" role="status">
+            Copy unavailable in this browser — select the command above manually.
+          </p>
+        )}
       </div>
     </section>
   );
@@ -64,125 +112,44 @@ function Hero() {
 
 function Preview() {
   return (
-    <section className="nimi-section" style={{ paddingTop: 0 }}>
-      <div className="nimi-hero-preview">
-        <HeroPreview />
-      </div>
-    </section>
-  );
-}
-
-function HowItWorks() {
-  return (
-    <section className="nimi-section" style={{ background: "var(--color-background-muted)" }}>
+    <section className="nimi-section nimi-preview-section" aria-labelledby="nimi-preview-title">
       <div className="nimi-section-header">
-        <Heading level={2} className="nimi-section-title">
-          How it works
+        <Heading level={2} className="nimi-section-title" id="nimi-preview-title">
+          Watch a run unfold
         </Heading>
         <p className="nimi-section-lead">
-          Nimi runs a read-act loop: it streams a language model, decides what to do, calls tools, and
-          repeats until the task is done.
+          Replay a sample run — no API key needed for this demo. Scrub the trace, inspect tool
+          calls, and see where the permission gate applies.
         </p>
       </div>
-      <div className="nimi-steps">
-        <Step
-          title="Prompt"
-          body="Give Nimi a task in plain language. It parses flags, loads settings, and builds a system prompt with your tool catalog."
-        />
-        <Step
-          title="Stream"
-          body="The model streams back text and tool calls. Every token and decision is recorded into a replayable JSONL trace."
-        />
-        <Step
-          title="Act"
-          body="Nimi dispatches read-only tools automatically and asks before write, bash, or git mutations."
-        />
-        <Step
-          title="Inspect"
-          body="Open the trace in the playground to scrub through every turn, inspect context, source, and stdout."
-        />
-      </div>
+      <figure className="nimi-preview-frame">
+        <figcaption className="nimi-preview-bar">
+          <span className="nimi-preview-title">
+            Sample replay · find all TODOs → NOTES.md
+          </span>
+          <a href="#/playground" className="nimi-preview-open">
+            Open interactive replay <span aria-hidden>→</span>
+          </a>
+        </figcaption>
+        <div className="nimi-hero-preview">
+          <HeroPreview viewBox="600 190 960 300" legend={false} />
+        </div>
+        <figcaption className="nimi-preview-caption">
+          Focused crop of the architecture graph — the full interactive map lives in the playground.
+        </figcaption>
+      </figure>
     </section>
-  );
-}
-
-function Step({ title, body }) {
-  return (
-    <div className="nimi-step">
-      <p className="nimi-step-title">{title}</p>
-      <p className="nimi-step-body">{body}</p>
-    </div>
-  );
-}
-
-function Capabilities() {
-  return (
-    <section className="nimi-section">
-      <div className="nimi-section-header">
-        <Heading level={2} className="nimi-section-title">
-          Built for clarity
-        </Heading>
-        <p className="nimi-section-lead">
-          The playground turns a dense execution trace into a readable, interactive map.
-        </p>
-      </div>
-      <div className="nimi-features">
-        <Feature
-          icon="viewColumns"
-          title="Interactive architecture graph"
-          body="Pan and zoom through the actual codebase graph. See which function is active, what called it, and where data flows."
-        />
-        <Feature
-          icon="clock"
-          title="Turn-by-turn playback"
-          body="Scrub forwards and backwards through the agent loop at your own speed, or press play and watch the run unfold."
-        />
-        <Feature
-          icon="wrench"
-          title="Tool call transparency"
-          body="Every grep, read, write, and bash call is visible—along with its input, output, and permission decision."
-        />
-        <Feature
-          icon="copy"
-          title="Context inspection"
-          body="Inspect the full message history, JSONL payload, source code, and stdout for any point in the run."
-        />
-        <Feature
-          icon="warning"
-          title="Permission simulation"
-          body="Switch between Allow and Deny branches to see how the permission gate shapes the execution."
-        />
-        <Feature
-          icon="arrowsUpDown"
-          title="Multiple render modes"
-          body="Switch between Print, Classic REPL, and TUI views to understand how the same run surfaces in each interface."
-        />
-      </div>
-    </section>
-  );
-}
-
-function Feature({ icon, title, body }) {
-  return (
-    <div className="nimi-feature">
-      <span className="nimi-feature-icon">
-        <Icon icon={icon} size="sm" />
-      </span>
-      <p className="nimi-feature-title">{title}</p>
-      <p className="nimi-feature-body">{body}</p>
-    </div>
   );
 }
 
 function FinalCta() {
   return (
-    <section className="nimi-cta-section" style={{ background: "var(--color-background-muted)" }}>
-      <Heading level={2} className="nimi-section-title" style={{ maxWidth: 480 }}>
-        Ready to trace your first run?
+    <section className="nimi-cta-section" aria-labelledby="nimi-cta-title">
+      <Heading level={2} className="nimi-section-title" id="nimi-cta-title" style={{ maxWidth: 560 }}>
+        Try the replay, then run it yourself.
       </Heading>
       <p className="nimi-section-lead">
-        Open the playground with a preloaded example, or run Nimi in your terminal and inspect your own
-        traces.
+        The playground needs nothing but a browser. The CLI needs Node 22 and one provider key.
       </p>
       <div className="nimi-hero-actions">
         <Button
@@ -195,14 +162,26 @@ function FinalCta() {
           }}
         />
         <Button
-          label="Explore Examples"
+          label="View source"
           variant="secondary"
           size="lg"
+          endContent={<Icon icon="externalLink" size="sm" />}
           onClick={() => {
-            window.location.hash = "#/examples";
+            window.open(GITHUB_URL, "_blank", "noreferrer");
           }}
         />
       </div>
+      <p className="nimi-cta-links">
+        <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+        <span aria-hidden>·</span>
+        <a href={NPM_URL} target="_blank" rel="noreferrer">
+          npm
+        </a>
+        <span aria-hidden>·</span>
+        <code className="nimi-mono-inline">{INSTALL_CMD}</code>
+      </p>
     </section>
   );
 }
@@ -210,10 +189,21 @@ function FinalCta() {
 function Footer() {
   return (
     <footer className="nimi-footer">
-      <span className="nimi-brand-mark" style={{ width: 18, height: 18, fontSize: 10 }}>
-        N
-      </span>
-      Nimi Code — minimal coding agent
+      <img src="./nimi-logo-transparent.png" alt="Nimi" className="nimi-footer-logo" />
+      <p className="nimi-footer-copy">© 2026 Nimi Code · ISC licensed</p>
+      <nav className="nimi-footer-links" aria-label="Footer">
+        <a href="#/">Home</a>
+        <a href="#/playground">Playground</a>
+        <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+        <a href={NPM_URL} target="_blank" rel="noreferrer">
+          npm
+        </a>
+      </nav>
+      <p className="nimi-footer-note">
+        Demo playground replays a bundled sample trace; it is not a live agent run.
+      </p>
     </footer>
   );
 }

@@ -1,12 +1,18 @@
 // Playground: the centre-piece of Nimi Code.
-// Canvas-first layout with an inspector sidebar and a playback timeline.
+// Workbench layout: run header, compact control row, graph + inspector,
+// and a persistent timeline footer. The replay semantics (trace fold,
+// allow/deny branches, URL state) are unchanged.
 import { useEffect, useMemo, useState } from "react";
+import { Badge } from "@astryxdesign/core/Badge";
+import { Selector } from "@astryxdesign/core/Selector";
+import { Text } from "@astryxdesign/core/Text";
 import Canvas from "../components/Canvas/Canvas.jsx";
 import Inspector from "../components/Inspector/Inspector.jsx";
 import Timeline from "../components/Timeline/Timeline.jsx";
 import Toolbar from "../components/Toolbar/Toolbar.jsx";
 import { replay, turnTokens } from "../data/trace.js";
 import { describeStep } from "../data/architecture.js";
+import { SAMPLE_RUNS, matchSample } from "../data/samples.js";
 
 const SPEEDS = { "0.5x": 800, "1x": 380, "2x": 180 };
 
@@ -98,7 +104,7 @@ export default function PlaygroundPage({ parsed }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target?.tagName === "INPUT") return;
+      if (e.target?.tagName === "INPUT" || e.target?.tagName === "TEXTAREA") return;
       if (e.key === " ") {
         e.preventDefault();
         setPlaying((p) => !p);
@@ -134,8 +140,44 @@ export default function PlaygroundPage({ parsed }) {
       v === "allow" ? { ...p, branch: "allow", index: max } : { ...p, branch: "deny", index: denyLimit },
     );
 
+  const currentSample = matchSample(pos.output, pos.branch);
+  const handleSampleChange = (id) => {
+    const sample = SAMPLE_RUNS.find((s) => s.id === id);
+    if (!sample) return;
+    setPinnedNodeId(null);
+    setSelTraceId(null);
+    setPlaying(false);
+    window.location.hash = `#/playground?output=${sample.output}&branch=${sample.branch}&index=0`;
+  };
+
   return (
     <div className="nimi-playground">
+      <div className="nimi-run-header">
+        <div className="nimi-run-identity">
+          <div className="nimi-run-title-row">
+            <Text type="body" weight="semibold" className="nimi-run-sample-name">
+              {currentSample.title}
+            </Text>
+            <Badge label="Sample replay" tone="info" size="sm" />
+          </div>
+          <Text type="label" color="secondary" className="nimi-mono nimi-run-meta">
+            {parsed.header.provider} / {parsed.header.model} · “{parsed.header.prompt}”
+          </Text>
+          <Text type="label" color="secondary" className="nimi-run-note">
+            Bundled trace replay — Allow / Deny only switches the replay branch. Nothing here
+            touches a live machine.
+          </Text>
+        </div>
+        <div className="nimi-run-sample-picker">
+          <Selector
+            label="Sample run"
+            value={currentSample.id}
+            onChange={handleSampleChange}
+            options={SAMPLE_RUNS.map((s) => ({ value: s.id, label: s.title }))}
+            size="sm"
+          />
+        </div>
+      </div>
       <Toolbar
         pos={pos}
         max={max}
@@ -144,10 +186,19 @@ export default function PlaygroundPage({ parsed }) {
         onGo={go}
         onOutputChange={handleOutputChange}
         onBranchChange={handleBranchChange}
-        header={parsed.header}
       />
       <div className="nimi-playground-body">
-        <div className="nimi-playground-main">
+        <section className="nimi-playground-main" aria-label="Replay graph">
+          <div className="nimi-workbench-heading">
+            <Text type="label" weight="semibold">
+              {canvasMode === "dataflow" ? "Architecture · dataflow" : "Execution · streaming"}
+            </Text>
+            <Text type="label" color="secondary">
+              {canvasMode === "dataflow"
+                ? "Where the current step runs in the codebase"
+                : "Chronological chain of trace events"}
+            </Text>
+          </div>
           <div className="nimi-playground-canvas">
             <Canvas
               view={view}
@@ -174,8 +225,8 @@ export default function PlaygroundPage({ parsed }) {
               view={view}
             />
           </div>
-        </div>
-        <div className="nimi-playground-sidebar">
+        </section>
+        <aside className="nimi-playground-sidebar" aria-label="Step inspector">
           <Inspector
             view={view}
             parsed={parsed}
@@ -183,11 +234,11 @@ export default function PlaygroundPage({ parsed }) {
             stepNum={pos.index + 1}
             totalSteps={max + 1}
             output={replayOutput}
+            uiMode={pos.output}
             branch={pos.branch}
             pinnedNodeId={pinnedNodeId}
-            onPlay={togglePlay}
           />
-        </div>
+        </aside>
       </div>
     </div>
   );

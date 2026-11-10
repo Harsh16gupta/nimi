@@ -1,6 +1,8 @@
 // Interactive architecture & execution canvas.
 // Supports dataflow (codebase call-graph) and streaming (chronological
 // trace chain) lenses, with drag-to-pan, wheel-to-zoom, and node selection.
+// Graph nodes are keyboard reachable; the active step uses one restrained
+// accent treatment.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@astryxdesign/core/Button";
 import {
@@ -168,7 +170,7 @@ export default function Canvas({
       onPointerLeave={handlePointerUp}
     >
       {!readOnly && (
-        <div className="nimi-canvas-float-tl">
+        <div className="nimi-canvas-bar">
           <SegmentedControl
             label="Canvas lens"
             value={canvasMode}
@@ -214,6 +216,30 @@ export default function Canvas({
               tooltip="Resume following step playback"
             />
           )}
+          <span className="nimi-canvas-bar-spacer" />
+          <details className="nimi-canvas-view">
+            <summary>View</summary>
+            <div className="nimi-canvas-view-menu">
+              <Text type="label" color="secondary">
+                Highlight subsystem
+              </Text>
+              <div className="nimi-canvas-view-chips">
+                {SUBSYSTEMS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className={`nimi-canvas-chip${hoverGroup === s.id ? " is-active" : ""}`}
+                    aria-pressed={hoverGroup === s.id}
+                    onClick={() => setHoverGroup((g) => (g === s.id ? null : s.id))}
+                    title={`Highlight ${s.label} subsystem`}
+                  >
+                    <span className="nimi-canvas-legend-dot" style={{ background: getNodeColor(s.id) }} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
       )}
 
@@ -249,26 +275,9 @@ export default function Canvas({
       </div>
 
       {!readOnly && (
-        <>
-          <div className="nimi-canvas-float-bl">
-            {SUBSYSTEMS.map((s) => (
-              <Button
-                key={s.id}
-                label={s.label}
-                size="sm"
-                variant="ghost"
-                icon={<span className="nimi-canvas-legend-dot" style={{ background: getNodeColor(s.id) }} />}
-                onClick={() => setHoverGroup((g) => (g === s.id ? null : s.id))}
-                tooltip={`Highlight ${s.label} subsystem`}
-              />
-            ))}
-          </div>
-          <div className="nimi-canvas-float-br">
-            <Text type="label" color="secondary" className="nimi-mono">
-              drag pan · scroll zoom · ←/→ step · space play
-            </Text>
-          </div>
-        </>
+        <p className="nimi-canvas-hint">
+          Drag to pan · scroll to zoom · Enter on a node to pin it · ←/→ step · space plays
+        </p>
       )}
     </div>
   );
@@ -318,9 +327,6 @@ function DataflowSvg({
             strokeLinejoin="round"
           />
         </marker>
-        <filter id="nimi-node-glow" x="-25%" y="-25%" width="150%" height="150%">
-          <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="var(--color-accent)" floodOpacity="0.28" />
-        </filter>
       </defs>
 
       {showZones &&
@@ -343,7 +349,7 @@ function DataflowSvg({
               fontSize="9"
               fontFamily="var(--font-family-code)"
               letterSpacing="0.09em"
-              fill="var(--color-text-tertiary)"
+              fill="var(--color-text-secondary)"
             >
               {z.label}
             </text>
@@ -361,9 +367,6 @@ function DataflowSvg({
 
         return (
           <g key={edge.id}>
-            {isHot && (
-              <path d={d} fill="none" stroke={edgeActiveColor} strokeWidth="4.5" strokeOpacity="0.12" />
-            )}
             <path
               d={d}
               fill="none"
@@ -371,16 +374,6 @@ function DataflowSvg({
               strokeWidth={isHot ? "1.65" : "1.15"}
               markerEnd={isHot ? "url(#nimi-arrow-hot)" : "url(#nimi-arrow-dim)"}
             />
-            {isHot && (
-              <path
-                d={d}
-                fill="none"
-                stroke="var(--color-text-accent)"
-                strokeWidth="1.65"
-                strokeDasharray="4 8"
-                opacity="0.8"
-              />
-            )}
             {isHot && (
               <g transform={`translate(${lx}, ${ly})`}>
                 <rect
@@ -432,12 +425,23 @@ function DataflowSvg({
           subFill = isDeniedNode ? "var(--nimi-amber)" : "var(--color-text-secondary)";
         }
 
+        const accessibleName = `${node.title}, ${node.sub}${isPrimary ? ", current step" : ""}${pinnedNodeId === node.id ? ", pinned" : ""}`;
         return (
           <g
             key={node.id}
             transform={`translate(${node.x}, ${node.y})`}
             className="nimi-canvas-node"
+            tabIndex={0}
+            role="button"
+            aria-label={accessibleName}
+            aria-current={isPrimary ? "step" : undefined}
             onClick={() => onSelectArchNode(pinnedNodeId === node.id ? null : node.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelectArchNode(pinnedNodeId === node.id ? null : node.id);
+              }
+            }}
             opacity={dimmedByHover ? 0.25 : 1}
           >
             <rect
@@ -447,7 +451,6 @@ function DataflowSvg({
               fill={fill}
               stroke={stroke}
               strokeWidth={isPrimary ? "1.6" : "1"}
-              filter={isPrimary ? "url(#nimi-node-glow)" : undefined}
             />
             <rect
               x="0.5"
@@ -526,7 +529,17 @@ function StreamingSvg({ traceNodes, selTraceId, onSelectTraceNode }) {
             <g
               transform={`translate(${x}, ${y})`}
               className="nimi-canvas-node"
+              tabIndex={0}
+              role="button"
+              aria-label={`${n.title}, ${n.sub}${isSel ? ", selected" : ""}`}
+              aria-current={isSel ? "step" : undefined}
               onClick={() => onSelectTraceNode(n)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectTraceNode(n);
+                }
+              }}
             >
               <rect
                 width={w}

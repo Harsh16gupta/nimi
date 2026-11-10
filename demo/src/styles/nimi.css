@@ -1,7 +1,7 @@
 /* Nimi Code — product-wide styles.
    Built on Astryx tokens; custom surfaces for graph, timeline, and
-   product-specific chrome. No raw <div> layout; spacing comes from
-   Astryx components and these targeted product classes. */
+   product-specific chrome. Spacing comes from Astryx tokens and these
+   targeted product classes. */
 
 html,
 body,
@@ -10,6 +10,11 @@ body,
   margin: 0;
   background: var(--color-background-body);
   color: var(--color-text-primary);
+}
+
+html,
+body {
+  overflow-x: clip;
 }
 
 #root {
@@ -28,6 +33,48 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.nimi-mono-inline {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.nimi-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.nimi-canvas-node:focus {
+  outline: none;
+}
+
+.nimi-canvas-node:focus-visible {
+  outline: none;
+}
+
+.nimi-canvas-node:focus-visible > rect:first-of-type {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
 /* --------------------------------------------------------------------------
    Top navigation
    -------------------------------------------------------------------------- */
@@ -36,24 +83,19 @@ body,
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-2);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--color-text-primary);
-  font-size: var(--font-size-lg);
   white-space: nowrap;
 }
 
-.nimi-brand-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+.nimi-brand-logo {
+  height: 22px;
+  width: auto;
+  display: block;
+}
+
+.nimi-header-actions {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 800;
+  gap: var(--spacing-1);
 }
 
 .nimi-nav-link {
@@ -64,6 +106,10 @@ body,
   padding: var(--spacing-1-5) var(--spacing-3);
   border-radius: var(--radius-element);
   transition: color 140ms ease, background 140ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  white-space: nowrap;
 }
 
 .nimi-nav-link:hover {
@@ -88,7 +134,7 @@ body,
 
 .nimi-hero {
   position: relative;
-  padding: var(--spacing-10) var(--spacing-6) var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-6) var(--spacing-10);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -97,29 +143,29 @@ body,
   overflow: hidden;
 }
 
+/* Single restrained wash behind the hero only. */
 .nimi-hero-bg {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(ellipse 70% 50% at 50% 0%, var(--color-accent-muted), transparent 60%),
-    radial-gradient(ellipse 50% 35% at 80% 40%, var(--nimi-violet-muted), transparent 50%);
-  opacity: 0.6;
+  background: radial-gradient(ellipse 60% 45% at 50% 0%, var(--color-accent-muted), transparent 65%);
+  opacity: 0.55;
 }
 
+/* Very faint dot texture, confined to the hero and faded before next section. */
 .nimi-hero-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image: radial-gradient(var(--nimi-canvas-dots) 1px, transparent 1px);
   background-size: 32px 32px;
-  mask-image: linear-gradient(to bottom, black 10%, transparent 70%);
-  opacity: 0.4;
+  mask-image: linear-gradient(to bottom, black 10%, transparent 75%);
+  opacity: 0.28;
 }
 
 .nimi-hero-content {
   position: relative;
-  max-width: 720px;
+  max-width: 780px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -142,21 +188,21 @@ body,
 }
 
 .nimi-headline {
-  font-size: clamp(2.25rem, 6vw, 3.75rem);
-  line-height: 1.08;
-  letter-spacing: -0.04em;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
   font-weight: 700;
   margin: 0;
-  background: linear-gradient(180deg, var(--color-text-primary) 0%, var(--color-text-secondary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--color-text-primary);
+  text-wrap: balance;
+  max-width: 22ch;
 }
 
 .nimi-lead {
   font-size: var(--font-size-lg);
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--color-text-secondary);
-  max-width: 560px;
+  max-width: 620px;
   margin: 0;
 }
 
@@ -168,25 +214,145 @@ body,
   justify-content: center;
 }
 
-.nimi-hero-preview {
-  position: relative;
-  width: calc(100% - var(--spacing-8));
-  max-width: 1000px;
-  border-radius: var(--radius-container);
+.nimi-install-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  margin: 0;
+  padding: var(--spacing-2) var(--spacing-2) var(--spacing-2) var(--spacing-4);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-muted);
+  max-width: 100%;
+}
+
+.nimi-install-cmd {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  user-select: all;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.nimi-install-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-element);
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.nimi-install-copy:hover {
+  color: var(--color-text-primary);
+  background: var(--color-overlay-hover);
+  border-color: var(--color-border);
+}
+
+.nimi-install-fallback {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Preview: framed crop of the real architecture graph. */
+.nimi-preview-section {
+  padding-top: 0;
+}
+
+.nimi-preview-frame {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
   background: var(--nimi-panel);
   box-shadow: 0 24px 80px var(--color-shadow);
   overflow: hidden;
 }
 
+.nimi-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--nimi-panel-elevated);
+}
+
+.nimi-preview-title {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.nimi-preview-open {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nimi-preview-open:hover {
+  text-decoration: underline;
+}
+
+.nimi-hero-preview {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--color-background-body);
+  background-image: radial-gradient(var(--nimi-canvas-dots) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
 .nimi-hero-preview-inner {
-  aspect-ratio: 16 / 9;
-  min-height: 320px;
-  max-height: 520px;
+  aspect-ratio: 16 / 5;
+  min-height: 220px;
+  max-height: 360px;
+}
+
+.nimi-preview-caption {
+  margin: 0;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  text-align: left;
+}
+
+.nimi-preview-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+  padding: 0 var(--spacing-4) var(--spacing-3);
+  background: var(--nimi-panel);
+}
+
+.nimi-preview-legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--nimi-panel-elevated);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
 }
 
 .nimi-section {
-  padding: var(--spacing-16) var(--spacing-6);
+  padding: var(--spacing-12) var(--spacing-6);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -216,95 +382,8 @@ body,
   margin: 0;
 }
 
-.nimi-features {
-  width: 100%;
-  max-width: 1100px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--spacing-4);
-}
-
-.nimi-feature {
-  padding: var(--spacing-5);
-  border-radius: var(--radius-container);
-  border: 1px solid var(--color-border);
-  background: var(--nimi-panel);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-}
-
-.nimi-feature-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-element);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-accent-muted);
-  color: var(--color-text-accent);
-}
-
-.nimi-feature-title {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  margin: 0;
-}
-
-.nimi-feature-body {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin: 0;
-}
-
-.nimi-steps {
-  width: 100%;
-  max-width: 900px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--spacing-6);
-  counter-reset: step;
-}
-
-.nimi-step {
-  position: relative;
-  padding-left: var(--spacing-10);
-}
-
-.nimi-step::before {
-  counter-increment: step;
-  content: counter(step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-}
-
-.nimi-step-title {
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  margin: 0 0 var(--spacing-1) 0;
-}
-
-.nimi-step-body {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-  margin: 0;
-}
-
 .nimi-cta-section {
-  padding: var(--spacing-16) var(--spacing-6);
+  padding: var(--spacing-12) var(--spacing-6);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -313,15 +392,72 @@ body,
   border-top: 1px solid var(--color-border);
 }
 
+.nimi-cta-links {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.nimi-cta-links a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.nimi-cta-links a:hover {
+  color: var(--color-text-primary);
+  text-decoration: underline;
+}
+
 .nimi-footer {
-  padding: var(--spacing-6);
+  padding: var(--spacing-10) var(--spacing-6) var(--spacing-8);
   border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--spacing-3);
+}
+
+.nimi-footer-logo {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.nimi-footer-copy {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
+
+.nimi-footer-links {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-3);
-  color: var(--color-text-tertiary);
+  flex-wrap: wrap;
+  gap: var(--spacing-1) var(--spacing-4);
+}
+
+.nimi-footer-links a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.nimi-footer-links a:hover {
+  color: var(--color-text-primary);
+}
+
+.nimi-footer-note {
+  color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
+  margin: 0;
+  max-width: 560px;
 }
 
 /* --------------------------------------------------------------------------
@@ -334,6 +470,53 @@ body,
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+.nimi-run-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--nimi-panel);
+}
+
+.nimi-run-identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.nimi-run-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+}
+
+.nimi-run-sample-name {
+  margin: 0;
+}
+
+.nimi-run-meta {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nimi-run-note {
+  margin: 0;
+}
+
+.nimi-run-sample-picker {
+  flex: 0 1 280px;
+  min-width: 220px;
+  max-width: 100%;
 }
 
 .nimi-playground-body {
@@ -349,6 +532,16 @@ body,
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+
+.nimi-workbench-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+  padding: var(--spacing-2) var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--nimi-panel);
 }
 
 .nimi-playground-canvas {
@@ -369,13 +562,12 @@ body,
 }
 
 .nimi-playground-footer {
-  height: 88px;
   min-height: 88px;
   border-top: 1px solid var(--color-border);
   background: var(--nimi-panel);
   display: flex;
   align-items: center;
-  padding: 0 var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
   gap: var(--spacing-4);
 }
 
@@ -384,20 +576,21 @@ body,
    -------------------------------------------------------------------------- */
 
 .nimi-toolbar {
-  height: 52px;
   min-height: 52px;
   border-bottom: 1px solid var(--color-border);
   background: var(--nimi-panel);
   display: flex;
   align-items: center;
-  padding: 0 var(--spacing-4);
-  gap: var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
 }
 
 .nimi-toolbar-group {
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
+  flex-wrap: wrap;
 }
 
 .nimi-toolbar-spacer {
@@ -408,6 +601,17 @@ body,
   width: 1px;
   height: 24px;
   background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.nimi-toolbar-caption {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.nimi-toolbar-note {
+  margin: 0;
+  white-space: nowrap;
 }
 
 /* --------------------------------------------------------------------------
@@ -428,6 +632,95 @@ body,
 
 .nimi-canvas.is-dragging {
   cursor: grabbing;
+}
+
+.nimi-canvas-bar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex-wrap: wrap;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--nimi-panel);
+}
+
+.nimi-canvas-bar-spacer {
+  flex: 1;
+}
+
+.nimi-canvas-view {
+  position: relative;
+}
+
+.nimi-canvas-view > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-element);
+  background: var(--color-background-muted);
+  white-space: nowrap;
+}
+
+.nimi-canvas-view > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nimi-canvas-view > summary:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-emphasized);
+}
+
+.nimi-canvas-view-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--spacing-2));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - var(--spacing-8)));
+  padding: var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--nimi-panel-elevated);
+  box-shadow: 0 16px 48px var(--color-shadow);
+}
+
+.nimi-canvas-view-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-1-5);
+}
+
+.nimi-canvas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1-5);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 5px;
+  border: 1px solid var(--color-border);
+  background: var(--nimi-panel);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.nimi-canvas-chip:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-emphasized);
+}
+
+.nimi-canvas-chip.is-active {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
 }
 
 .nimi-canvas-viewport {
@@ -470,40 +763,27 @@ body,
   transition: fill 160ms ease, stroke 160ms ease;
 }
 
-.nimi-canvas-float {
-  position: absolute;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  flex-wrap: wrap;
-}
-
-.nimi-canvas-float-tl {
-  composes: nimi-canvas-float;
-  top: var(--spacing-3);
-  left: var(--spacing-3);
-}
-
-.nimi-canvas-float-bl {
-  composes: nimi-canvas-float;
-  left: var(--spacing-3);
-  bottom: var(--spacing-3);
-  max-width: 60%;
-}
-
-.nimi-canvas-float-br {
-  composes: nimi-canvas-float;
-  right: var(--spacing-3);
-  bottom: var(--spacing-3);
-}
-
 .nimi-canvas-legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 2px;
   display: inline-block;
   flex-shrink: 0;
+}
+
+.nimi-canvas-hint {
+  margin: 0;
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border-top: 1px solid var(--color-border);
+  background: var(--nimi-panel);
+  font-family: var(--font-family-code);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --------------------------------------------------------------------------
@@ -524,6 +804,8 @@ body,
   align-items: stretch;
   gap: var(--spacing-3);
   min-height: 40px;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .nimi-timeline-turn {
@@ -584,7 +866,6 @@ body,
   height: 22px;
   background: var(--color-accent);
   border-color: var(--color-text-accent);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .nimi-step-block:not(.past):not(.current):not(.denied-gate):not(.truncated):hover {
@@ -605,6 +886,7 @@ body,
   align-items: center;
   gap: var(--spacing-4);
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 /* --------------------------------------------------------------------------
@@ -697,88 +979,63 @@ body,
   padding: 0 var(--spacing-3) var(--spacing-3) var(--spacing-3);
 }
 
-.nimi-empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  gap: var(--spacing-3);
-  padding: var(--spacing-8);
-  color: var(--color-text-secondary);
-}
-
-/* --------------------------------------------------------------------------
-   Examples
-   -------------------------------------------------------------------------- */
-
-.nimi-examples {
-  flex: 1;
-  padding: var(--spacing-8) var(--spacing-6);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-8);
-}
-
-.nimi-examples-grid {
-  width: 100%;
-  max-width: 1100px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--spacing-4);
-}
-
-.nimi-example-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-  padding: var(--spacing-5);
-  border-radius: var(--radius-container);
+.nimi-advanced {
   border: 1px solid var(--color-border);
-  background: var(--nimi-panel);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  border-radius: var(--radius-container);
+  background: var(--nimi-panel-elevated);
+}
+
+.nimi-advanced > summary {
   cursor: pointer;
-  text-align: left;
-}
-
-.nimi-example-card:hover {
-  border-color: var(--color-border-emphasized);
-  box-shadow: 0 8px 30px var(--color-shadow);
-}
-
-.nimi-example-card:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-.nimi-example-tags {
+  list-style: none;
   display: flex;
-  align-items: center;
-  gap: var(--spacing-2);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  padding: var(--spacing-3) var(--spacing-4);
 }
 
-.nimi-example-tag {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--color-background-muted);
-  color: var(--color-text-secondary);
+.nimi-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.nimi-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: 0 var(--spacing-4) var(--spacing-4) var(--spacing-4);
 }
 
 /* --------------------------------------------------------------------------
    Responsive
    -------------------------------------------------------------------------- */
 
+@media (max-width: 1100px) {
+  .nimi-toolbar-note {
+    display: none;
+  }
+}
+
 @media (max-width: 980px) {
+  .nimi-playground {
+    overflow: visible;
+  }
+
+  .nimi-run-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .nimi-run-sample-picker {
+    flex: 1 1 auto;
+  }
+
+  .nimi-run-meta {
+    white-space: normal;
+  }
+
   .nimi-playground-body {
     flex-direction: column;
-    overflow: auto;
+    overflow: visible;
   }
 
   .nimi-playground-sidebar {
@@ -795,7 +1052,6 @@ body,
 
   .nimi-playground-footer {
     height: auto;
-    min-height: auto;
     flex-direction: column;
     align-items: stretch;
     padding: var(--spacing-3) var(--spacing-4);
@@ -803,10 +1059,6 @@ body,
   }
 
   .nimi-toolbar {
-    height: auto;
-    min-height: 52px;
-    flex-wrap: wrap;
-    padding: var(--spacing-2) var(--spacing-4);
     gap: var(--spacing-2);
   }
 
@@ -814,8 +1066,22 @@ body,
     display: none;
   }
 
+  .nimi-toolbar-divider {
+    display: none;
+  }
+
   .nimi-hero-preview-inner {
-    min-height: 300px;
+    min-height: 220px;
+  }
+
+  .nimi-canvas-hint {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 760px) {
+  .nimi-nav-external {
+    display: none;
   }
 }
 
@@ -828,12 +1094,29 @@ body,
     padding: var(--spacing-10) var(--spacing-4);
   }
 
-  .nimi-features,
-  .nimi-examples-grid {
-    grid-template-columns: 1fr;
+  .nimi-cta-section {
+    padding: var(--spacing-10) var(--spacing-4);
   }
 
-  .nimi-canvas-float {
+  .nimi-timeline-hint {
     display: none;
+  }
+
+  .nimi-canvas-viewport {
+    padding: var(--spacing-3);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
   }
 }
