@@ -1,6 +1,6 @@
 {
   "name": "nimi-code",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Minimal coding agent: a language model with controlled access to your files, shell, and git.",
   "license": "ISC",
   "author": "",
