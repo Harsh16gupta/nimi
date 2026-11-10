@@ -149,5 +149,9 @@ EXAMPLES
 }
 
 export function printVersion(): void {
-	console.log(`nimi ${typeof __NIMI_VERSION__ !== "undefined" ? __NIMI_VERSION__ : "dev"}`);
+	console.log(`nimi ${getVersion()}`);
+}
+
+export function getVersion(): string {
+	return typeof __NIMI_VERSION__ !== "undefined" ? __NIMI_VERSION__ : "dev";
 }

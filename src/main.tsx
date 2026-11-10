@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 import { createInterface } from "node:readline";
 import { runAgent } from "./agent.ts";
-import { parseArgs, printHelp, printVersion } from "./cli/arg.ts";
+import { parseArgs, getVersion, printHelp, printVersion } from "./cli/arg.ts";
 import { buildSystemPrompt } from "./config/system-prompt.ts";
 import { loadSettings } from "./config/settings.ts";
 import { allowAll, createPromptPermission } from "./permissions.ts";
@@ -220,5 +220,5 @@ if (args.classic) {
 }
 
 render(
-  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} contextLimit={args.contextLimit} initialSetup={missingAuth} />,
+  <App provider={provider} model={model} version={getVersion()} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} contextLimit={args.contextLimit} initialSetup={missingAuth} />,
 );

@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { ALL_TOOLS } from "../tools/index.ts";
 
 // Project context files, loaded in priority order if present.
-const CONTEXT_FILES = ["AGENTS.md", "CLAUDE.md", ".context", ".nimi/context.md"];
+// Exported so the TUI startup header can list exactly what was loaded.
+export const CONTEXT_FILES = ["AGENTS.md", "CLAUDE.md", ".context", ".nimi/context.md"];
 
 // Assemble the system prompt from base instructions, the tool list, any project
 // context files, and an optional extra string from settings.

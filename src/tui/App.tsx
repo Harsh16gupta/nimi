@@ -1,34 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, useApp, useInput } from "ink";
-import TextInput from "ink-text-input";
-import Spinner from "ink-spinner";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
 import { MODELS, getModelInfo } from "../providers/models.ts";
 import { MissingApiKeyError, getProvider, getProviderMeta, listProviders } from "../providers/index.ts";
-import { deleteApiKey, getAuthPath, getStoredKeySync, saveApiKey } from "../config/auth.ts";
+import { deleteApiKey, getAuthPath, saveApiKey } from "../config/auth.ts";
+import { CONTEXT_FILES } from "../config/system-prompt.ts";
 import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
 import { HELP_TEXT, parseBare, parseSlash } from "./slash.ts";
-
-type Row =
-  | { kind: "user"; id: number; text: string }
-  | { kind: "text"; id: number; text: string }
-  | {
-      kind: "tool";
-      id: number;
-      toolCallId: string;
-      label: string;
-      status: "running" | "ok" | "error";
-      summary: string;
-    };
+import { AuthKeyPrompt, AuthProviderPicker, type AuthFlow } from "./components/AuthDialog.tsx";
+import { Composer, ErrorLine, PermissionDialog } from "./components/Composer.tsx";
+import { Footer } from "./components/Footer.tsx";
+import { StartupHeader } from "./components/Header.tsx";
+import { renderRow, type Row } from "./components/ToolRow.tsx";
+import { getGitBranch } from "./components/util.ts";
 
 type AppProps = {
   // Null when startup found no key: the TUI opens the /login wizard instead.
   provider: Provider | null;
   model: string;
+  // Build version shown beside the wordmark (pi shows vX beside its logo).
+  version: string;
   system: string;
   tools: Tool[];
   initialPrompt?: string;
@@ -40,76 +36,7 @@ type AppProps = {
   initialSetup?: { providerName: string; envVar: string } | null;
 };
 
-type AuthFlow =
-  | { step: "provider"; mode: "login" | "logout"; selected: number }
-  | { step: "key"; providerId: string; envVar: string };
-
-const DIVIDER_MAX = 80;
-
-function Header({ model, sessionId }: { model: string; sessionId: string }) {
-  const width = process.stdout.columns ?? 60;
-  const count = Math.max(20, Math.min(width - 2, DIVIDER_MAX));
-  return (
-    <Box flexDirection="column">
-      <Box>
-        <Text bold>nimi</Text>
-        <Text dimColor>
-          {" "}
-          · {model} · {process.cwd()} · {sessionId.slice(-6)}
-        </Text>
-      </Box>
-      <Text dimColor>{"─".repeat(count)}</Text>
-    </Box>
-  );
-}
-
-function renderRow(row: Row): ReactNode {
-  if (row.kind === "user") {
-    return (
-      <Box key={row.id} marginTop={1}>
-        <Text bold>› </Text>
-        <Text>{row.text}</Text>
-      </Box>
-    );
-  }
-  if (row.kind === "text") {
-    return (
-      <Box key={row.id} marginTop={1}>
-        <Text wrap="wrap">{row.text}</Text>
-      </Box>
-    );
-  }
-  return (
-    <Box key={row.id} marginTop={0}>
-      <ToolRow row={row} />
-    </Box>
-  );
-}
-function ToolRow({ row }: { row: Extract<Row, { kind: "tool" }> }) {
-  if (row.status === "running") {
-    return (
-      <Box>
-        <Text dimColor>{"↳ "}</Text>
-        <Spinner type="dots" />
-        <Text dimColor> {row.label}</Text>
-      </Box>
-    );
-  }
-  const mark = row.status === "ok" ? "✓" : "✕";
-  const color = row.status === "ok" ? "green" : "red";
-  return (
-    <Box>
-      <Text dimColor>{"↳ "}</Text>
-      <Text color={color}>{mark}</Text>
-      <Text dimColor>
-        {" "}
-        {row.label} {row.summary}
-      </Text>
-    </Box>
-  );
-}
-
-export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages, contextLimit, initialSetup }: AppProps) {
+export default function App({ provider, model, version, system, tools, initialPrompt, yolo, sessionId, initialMessages, contextLimit, initialSetup }: AppProps) {
   const { exit } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState("");
@@ -118,11 +45,28 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const [session, setSession] = useState(0);
   // Pending write-tool approval: set by canUseTool, resolved by y/a/n keys.
   const [pending, setPending] = useState<{ name: string; input: Record<string, unknown>; resolve: (v: "yes" | "always" | "no") => void } | null>(null);
+  // Graceful exit: show a farewell row, let it paint, then quit.
+  const [leaving, setLeaving] = useState(false);
   // Pi-style auth flow: provider picker or masked key prompt, rendered
   // in place of the composer while active. Null during normal chatting.
   const [authFlow, setAuthFlow] = useState<AuthFlow | null>(null);
   const [keyDraft, setKeyDraft] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+
+  // Startup chrome: project context files actually present in the cwd,
+  // and the git branch (read once — branches rarely change mid-chat).
+  const contextFiles = useMemo(
+    () =>
+      CONTEXT_FILES.filter((f) => {
+        try {
+          return existsSync(join(process.cwd(), f));
+        } catch {
+          return false;
+        }
+      }),
+    [],
+  );
+  const branch = useMemo(() => getGitBranch(process.cwd()), []);
 
   const idRef = useRef(1);
   // History starts from the resumed session; savedCount tracks what is on disk.
@@ -139,6 +83,21 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const [activeModel, setActiveModel] = useState(model);
 
   const nextId = useCallback(() => idRef.current++, []);
+
+  // Pi-style exit: confirm the session is saved and print the resume
+  // command, then leave once the farewell has painted.
+  const quit = useCallback(() => {
+    if (leaving) return;
+    setLeaving(true);
+    const id = nextId();
+    setRows((prev) => [...prev, { kind: "text", id, text: `Session saved — resume with: nimi --session ${sessionId}` }]);
+  }, [leaving, nextId, sessionId]);
+
+  useEffect(() => {
+    if (!leaving) return;
+    const t = setTimeout(() => exit(), 150);
+    return () => clearTimeout(t);
+  }, [leaving, exit]);
 
   const appendText = useCallback((delta: string) => {
     const id = textIdRef.current;
@@ -263,13 +222,13 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const submitPrompt = useCallback(
     async (prompt: string) => {
       const text = prompt.trim();
-      if (!text || workingRef.current) return;
+      if (!text || workingRef.current || leaving) return;
       setError(null);
 
       const slash = parseSlash(text) ?? parseBare(text);
       if (slash) {
         if (slash.type === "quit") {
-          exit();
+          quit();
           return;
         }
         if (slash.type === "clear") {
@@ -351,10 +310,10 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           const id = nextId();
           const used = estimateTokens(messagesRef.current);
           const limit = getContextLimit(activeModel, contextLimit);
-          const text = limit
+          const text2 = limit
             ? `~${used} / ${limit} tokens (${Math.round((used / limit) * 100)}%) — auto-compacts at 75%`
             : `~${used} tokens (window unknown)`;
-          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text }]);
+          setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: text2 }]);
           idRef.current++;
           return;
         }
@@ -488,10 +447,23 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         }
       }
     },
-    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, authFlow, nextId, openKeyPrompt, openProviderPicker, runLogout, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, leaving, activeModel, activeProvider, authFlow, nextId, openKeyPrompt, openProviderPicker, quit, runLogout, sessionId, system, tools],
   );
 
   useInput((input, key) => {
+    // Ctrl+C exits cleanly when idle; interrupts the agent when working.
+    if (key.ctrl && input === "c") {
+      if (pending) {
+        pending.resolve("no");
+        return;
+      }
+      if (workingRef.current) {
+        abortRef.current?.abort();
+      } else if (!leaving) {
+        quit();
+      }
+      return;
+    }
     // Auth picker owns the keyboard while it is up (pi: selector replaces editor).
     if (authFlow?.step === "provider") {
       const options = listProviders();
@@ -544,6 +516,12 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
     }
   });
 
+  // Pi-style permission dialog: it replaces the composer while up, so
+  // y/a/n keystrokes never land in the draft — nothing to delete after.
+  useEffect(() => {
+    if (pending) setDraft("");
+  }, [pending]);
+
   useEffect(() => {
     // Startup without a key (or a logged-out switch): open the key prompt
     // for the requested provider, like pi's first-run /login.
@@ -562,99 +540,73 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
     }
   }, [initialPrompt, submitPrompt, activeProvider]);
 
-  // Only the last row ever mutates (streaming text appends to it,
-  // tool status flips on it). Everything before it is final, so it
-  // renders via <Static>: drawn once, never re-rendered per token.
-  // This keeps scrollback clean instead of duplicating every frame.
-  const settled = rows.length > 0 ? rows.slice(0, -1) : [];
+  // The boot box renders once at the very top of the scrollback and
+  // scrolls away like Claude's welcome box — never floating mid-page.
+  // (Ink paints <Static> above dynamic content, so a dynamic header
+  // would sink below the transcript as it grows.)
+  const items: Row[] = [{ kind: "boot", id: 0 }, ...(rows.length > 0 ? rows.slice(0, -1) : [])];
   const live = rows.length > 0 ? rows[rows.length - 1]! : null;
+
+  // Footer context usage, live from the same estimator as compaction.
+  const used = estimateTokens(messagesRef.current);
+  const limit = getContextLimit(activeModel, contextLimit);
 
   return (
     <Box flexDirection="column">
-      <Header model={activeModel} sessionId={sessionId} />
-      {rows.length === 0 && (
-        <Box marginTop={1}>
-          <Text dimColor>
-            {initialMessages.length > 0
-              ? `Resumed session — ${initialMessages.length} messages restored. Type, or /help.`
-              : "Type a message, or /help."}
-          </Text>
-        </Box>
-      )}
-      <Static key={session} items={settled}>
-        {(row) => renderRow(row)}
+      <Static key={session} items={items}>
+        {(row) =>
+          row.kind === "boot" ? (
+            <StartupHeader key="boot" version={version} resumedCount={initialMessages.length} contextFiles={contextFiles} />
+          ) : (
+            renderRow(row)
+          )
+        }
       </Static>
       {live && renderRow(live)}
       {authFlow?.step === "provider" && (
-        <Box marginTop={1} flexDirection="column">
-          <Text bold>{authFlow.mode === "login" ? "Select a provider to log in:" : "Select a provider to log out:"}</Text>
-          {listProviders().map((p, i) => {
-            const selected = i === authFlow.selected;
-            const saved = getStoredKeySync(p.id) ? "  ✓ saved" : "";
-            return (
-              <Text key={p.id} color={selected ? "cyan" : undefined} dimColor={!selected}>
-                {selected ? "→ " : "  "}{p.label} <Text dimColor>({p.id}){saved}</Text>
-              </Text>
-            );
-          })}
-          <Text dimColor>↑↓ navigate · enter select{activeProvider ? " · esc cancel" : ""}</Text>
-        </Box>
+        <AuthProviderPicker mode={authFlow.mode} selected={authFlow.selected} canCancel={activeProvider !== null} />
       )}
       {authFlow?.step === "key" && (
-        <Box marginTop={1} flexDirection="column">
-          <Text bold>Login to {authFlow.providerId}</Text>
-          <Text dimColor>Paste {authFlow.envVar} — saved to {getAuthPath()}</Text>
-          <Box marginTop={1}>
-            <Text dimColor>› </Text>
-            <TextInput
-              value={keyDraft}
-              onChange={setKeyDraft}
-              onSubmit={(value) => {
-                void submitKey(authFlow.providerId, value);
-              }}
-              placeholder="sk-…"
-              mask="*"
-            />
-          </Box>
-          {authError && (
-            <Box marginTop={1}>
-              <Text color="red">✕ {authError}</Text>
-            </Box>
-          )}
-          <Text dimColor>enter save · esc back</Text>
-        </Box>
+        <AuthKeyPrompt
+          providerId={authFlow.providerId}
+          envVar={authFlow.envVar}
+          draft={keyDraft}
+          onChange={setKeyDraft}
+          onSubmit={(value) => {
+            void submitKey(authFlow.providerId, value);
+          }}
+          error={authError}
+        />
+      )}
+      {pending && <PermissionDialog name={pending.name} input={pending.input} />}
+      {error && <ErrorLine message={error} />}
+      {!authFlow && !pending && (
+        <Composer
+          draft={draft}
+          onChange={setDraft}
+          onSubmit={(value) => {
+            if (pending) return;
+            setDraft("");
+            void submitPrompt(value);
+          }}
+          working={working}
+          canChat={activeProvider !== null}
+          busy={pending !== null}
+        />
       )}
       {pending && (
-        <Box marginTop={1} flexDirection="column">
-          <Text color="yellow">Permission needed: {shortLabel(pending.name, pending.input)}</Text>
-          <Text dimColor>y = yes · a = always · n = no (esc)</Text>
-        </Box>
-      )}
-      {error && (
         <Box marginTop={1}>
-          <Text color="red">✕ {error}</Text>
+          <Text dimColor>› …</Text>
         </Box>
       )}
-      {!authFlow && (
-        <Box marginTop={1}>
-          <Text dimColor={working}>› </Text>
-          <TextInput
-            value={draft}
-            onChange={setDraft}
-            onSubmit={(value) => {
-              if (pending) return;
-              setDraft("");
-              void submitPrompt(value);
-            }}
-            placeholder={pending ? "answer y/a/n…" : working ? "working…" : activeProvider ? "Ask nimi…" : "Run /login…"}
-          />
-        </Box>
-      )}
-      <Box>
-        <Text dimColor>
-          {authFlow ? "login flow · esc back" : working ? "working… esc to interrupt" : "enter send · /login /model /help · esc interrupt"}
-        </Text>
-      </Box>
+      <Footer
+        providerName={activeProvider?.name ?? null}
+        model={activeModel}
+        used={used}
+        limit={limit}
+        sessionId={sessionId}
+        branch={branch}
+      />
     </Box>
   );
 }
