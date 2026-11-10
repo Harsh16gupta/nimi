@@ -2,5 +2,6 @@ node_modules
 .env
 .nimi
 plan.md
+dist
 demo/dist
 demo/package-lock.json

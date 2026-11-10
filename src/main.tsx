@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
 import { runAgent } from "./agent.ts";
 import { parseArgs, printHelp, printVersion } from "./cli/arg.ts";
 import { buildSystemPrompt } from "./config/system-prompt.ts";
@@ -12,8 +11,9 @@ import { createTraceRecorder, withTrace } from "./trace/recorder.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
 import type { Message } from "./types.ts";
 
-// load the .env next to the code, so nimi works from any folder
-config({ path: fileURLToPath(new URL("../.env", import.meta.url)), quiet: true });
+// dotenv loads .env from the current working directory, so nimi picks up
+// keys wherever it is invoked (global installs must not read the package dir).
+config({ quiet: true });
 
 let args: ReturnType<typeof parseArgs>;
 try {

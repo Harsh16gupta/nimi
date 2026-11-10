@@ -14,9 +14,18 @@ nimi --classic "refactor src/tools/grep.ts"
 Requires Node 22+ and one provider key.
 
 ```
+npm install -g nimi
+export META_API_KEY=...   # or ANTHROPIC_API_KEY, OPENAI_API_KEY, ...
+nimi "hello"
+```
+
+From source:
+
+```
 npm install
 cp .env.example .env   # add your key(s)
-npx tsx src/main.tsx "hello"
+npm run build
+node bin/nimi.js "hello"
 ```
 
 ```env

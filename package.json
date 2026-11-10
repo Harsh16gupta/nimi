@@ -1,48 +1,60 @@
 {
-  "name": "nimi",
+  "name": "nimi-code",
   "version": "1.0.0",
   "description": "Minimal coding agent: a language model with controlled access to your files, shell, and git.",
   "license": "ISC",
   "author": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Harsh16gupta/pi-basic-handon.git"
+    "url": "git+https://github.com/Harsh16gupta/nimi.git"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "agent",
+    "coding-agent",
+    "cli",
+    "anthropic",
+    "openai"
+  ],
+  "homepage": "https://github.com/Harsh16gupta/nimi#readme",
+  "bugs": {
+    "url": "https://github.com/Harsh16gupta/nimi/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22"
   },
   "files": [
     "bin/",
-    "src/",
+    "dist/",
     "readme.md",
     "LICENSE"
   ],
-  "main": "index.js",
   "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build",
     "check": "biome lint src && npx tsc --noEmit",
     "test:tools": "vitest run test/tools.test.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run"
   },
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
-    "@astryxdesign/cli": "^0.7.11",
-    "@astryxdesign/core": "^0.7.11",
-    "@astryxdesign/theme-neutral": "^0.7.11",
-    "@stylexjs/stylex": "^0.19.1",
     "dotenv": "^18.0.5",
     "ink": "^8.0.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "openai": "^7.25.0",
-    "react": "^19.3.1",
-    "tsx": "^4.23.15"
+    "react": "^19.3.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.6.6",
     "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
+    "tsup": "^9.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   },

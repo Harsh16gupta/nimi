@@ -1,3 +1,6 @@
+// Injected at build time by tsup.config.ts (falls back to "dev" under tsx).
+declare const __NIMI_VERSION__: string | undefined;
+
 export interface CliArgs {
 	prompt?: string; // -p / --prompt: the text to send to the model
 	provider?: string; // -z / --provider: which provider to use
@@ -142,5 +145,5 @@ EXAMPLES
 }
 
 export function printVersion(): void {
-	console.log("nimi 1.0.0");
+	console.log(`nimi ${typeof __NIMI_VERSION__ !== "undefined" ? __NIMI_VERSION__ : "dev"}`);
 }
