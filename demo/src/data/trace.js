@@ -76,13 +76,13 @@ export function replay(parsed, index, { branch = "allow", output = "print" } = {
     }
     if (branch === "deny" && event.type === "tool_end" && gated.has(event.id)) {
       const name = gated.get(event.id);
-      events.push({ key: event.i ?? events.length, line, event: { type: "denied", id: event.id, name, reason: denyMessage(name) } });
-      events.push({ key: (event.i ?? events.length) + 0.5, line, event: { ...event, result: denyMessage(name), isError: true } });
+      events.push({ key: event.i ?? events.length, itemIndex: k, line, event: { type: "denied", id: event.id, name, reason: denyMessage(name) } });
+      events.push({ key: (event.i ?? events.length) + 0.5, itemIndex: k, line, event: { ...event, result: denyMessage(name), isError: true } });
       denied = { name, line };
       truncated = true;
       break; // the rest of the file is the allow branch
     }
-    events.push({ key: event.i ?? events.length, line, event });
+    events.push({ key: event.i ?? events.length, itemIndex: k, line, event });
   }
 
   return { events, snapshot, snapshotLine, denied, truncated, turns: groupTurns(events), blocks: toBlocks(events, output) };

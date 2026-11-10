@@ -3,14 +3,14 @@
 // to the real TypeScript files under src/.
 
 export const SUBSYSTEMS = [
-  { id: "entry", label: "entry", color: "#D97750" },
-  { id: "config", label: "config", color: "#D4A44A" },
-  { id: "loop", label: "agent loop", color: "#E07B53" },
-  { id: "provider", label: "provider", color: "#9E78E0" },
-  { id: "tools", label: "tools", color: "#78BDE0" },
-  { id: "permissions", label: "permissions", color: "#E07898" },
-  { id: "renderer", label: "renderer", color: "#6898E0" },
-  { id: "session", label: "session", color: "#76B88A" },
+  { id: "entry", label: "entry", color: "var(--nimi-violet)" },
+  { id: "config", label: "config", color: "var(--color-text-accent)" },
+  { id: "loop", label: "agent loop", color: "var(--color-accent)" },
+  { id: "provider", label: "provider", color: "var(--nimi-violet)" },
+  { id: "tools", label: "tools", color: "var(--nimi-green)" },
+  { id: "permissions", label: "permissions", color: "var(--nimi-amber)" },
+  { id: "renderer", label: "renderer", color: "var(--color-text-accent)" },
+  { id: "session", label: "session", color: "var(--nimi-green)" },
 ];
 
 export const SUBSYSTEM_COLOR = Object.fromEntries(

@@ -3,26 +3,34 @@
   "version": "1.0.0",
   "description": "Minimal coding agent: a language model with controlled access to your files, shell, and git.",
   "license": "ISC",
-  "author": "Harsh16gupta",
+  "author": "",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Harsh16gupta/pi-basic-handon.git"
   },
-  "keywords": ["ai", "agent", "coding", "cli", "llm"],
-  "engines": { "node": ">=22" },
-  "files": ["bin/", "src/", "readme.md", "LICENSE"],
+  "keywords": [],
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "readme.md",
+    "LICENSE"
+  ],
   "main": "index.js",
   "scripts": {
     "check": "biome lint src && npx tsc --noEmit",
     "test:tools": "vitest run test/tools.test.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
+    "@astryxdesign/cli": "^0.7.11",
+    "@astryxdesign/core": "^0.7.11",
+    "@astryxdesign/theme-neutral": "^0.7.11",
+    "@stylexjs/stylex": "^0.19.1",
     "dotenv": "^18.0.5",
     "ink": "^8.0.0",
     "ink-spinner": "^5.0.0",
@@ -40,5 +48,6 @@
   },
   "bin": {
     "nimi": "./bin/nimi.js"
-  }
+  },
+  "packageManager": "npm@11.20.0"
 }
