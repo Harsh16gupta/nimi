@@ -6,7 +6,8 @@ import Spinner from "ink-spinner";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
 import { MODELS, getModelInfo } from "../providers/models.ts";
-import { getProvider } from "../providers/index.ts";
+import { MissingApiKeyError, getProvider, getProviderMeta, listProviders } from "../providers/index.ts";
+import { deleteApiKey, getAuthPath, getStoredKeySync, saveApiKey } from "../config/auth.ts";
 import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
@@ -25,7 +26,8 @@ type Row =
     };
 
 type AppProps = {
-  provider: Provider;
+  // Null when startup found no key: the TUI opens the /login wizard instead.
+  provider: Provider | null;
   model: string;
   system: string;
   tools: Tool[];
@@ -34,7 +36,13 @@ type AppProps = {
   sessionId: string;
   initialMessages: Message[];
   contextLimit?: number;
+  // Set when the requested provider had no key at startup.
+  initialSetup?: { providerName: string; envVar: string } | null;
 };
+
+type AuthFlow =
+  | { step: "provider"; mode: "login" | "logout"; selected: number }
+  | { step: "key"; providerId: string; envVar: string };
 
 const DIVIDER_MAX = 80;
 
@@ -101,7 +109,7 @@ function ToolRow({ row }: { row: Extract<Row, { kind: "tool" }> }) {
   );
 }
 
-export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages, contextLimit }: AppProps) {
+export default function App({ provider, model, system, tools, initialPrompt, yolo, sessionId, initialMessages, contextLimit, initialSetup }: AppProps) {
   const { exit } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [draft, setDraft] = useState("");
@@ -110,6 +118,11 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   const [session, setSession] = useState(0);
   // Pending write-tool approval: set by canUseTool, resolved by y/a/n keys.
   const [pending, setPending] = useState<{ name: string; input: Record<string, unknown>; resolve: (v: "yes" | "always" | "no") => void } | null>(null);
+  // Pi-style auth flow: provider picker or masked key prompt, rendered
+  // in place of the composer while active. Null during normal chatting.
+  const [authFlow, setAuthFlow] = useState<AuthFlow | null>(null);
+  const [keyDraft, setKeyDraft] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const idRef = useRef(1);
   // History starts from the resumed session; savedCount tracks what is on disk.
@@ -156,6 +169,97 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
     [yolo],
   );
 
+  // --- Pi-style auth (/login, /logout, startup wizard) ---
+
+  // Open the key prompt for a known provider, or show an error row.
+  const openKeyPrompt = useCallback(
+    (providerId: string) => {
+      try {
+        const meta = getProviderMeta(providerId);
+        setKeyDraft("");
+        setAuthError(null);
+        setAuthFlow({ step: "key", providerId: meta.id, envVar: meta.envVar });
+      } catch (e) {
+        const id = nextId();
+        setRows((prev) => [...prev, { kind: "text", id, text: e instanceof Error ? e.message : String(e) }]);
+      }
+    },
+    [nextId],
+  );
+
+  const openProviderPicker = useCallback((mode: "login" | "logout") => {
+    setAuthError(null);
+    setAuthFlow({ step: "provider", mode, selected: 0 });
+  }, []);
+
+  // Persist the key (mode 0600, like pi's auth.json), then activate the provider.
+  const submitKey = useCallback(
+    async (providerId: string, key: string) => {
+      const trimmed = key.trim();
+      if (!trimmed) {
+        setAuthError("Empty key — paste an API key, or press esc to go back.");
+        return;
+      }
+      try {
+        await saveApiKey(providerId, trimmed);
+        const created = getProvider(providerId);
+        setActiveProvider(created);
+        // Stay on the current model when it already belongs to this
+        // provider; otherwise take the provider's default (pi behavior).
+        const current = getModelInfo(activeModel);
+        setActiveModel(current?.provider === providerId ? activeModel : created.defaultModel);
+        setAuthFlow(null);
+        setKeyDraft("");
+        setAuthError(null);
+        setError(null);
+        const id = nextId();
+        setRows((prev) => [...prev, { kind: "text", id, text: `Saved API key for ${providerId} to ${getAuthPath()}.` }]);
+      } catch (e) {
+        setAuthError(e instanceof Error ? e.message : String(e));
+      }
+    },
+    [activeModel, nextId],
+  );
+
+  const runLogout = useCallback(
+    async (providerId: string, echoCommand: string) => {
+      const id = nextId();
+      try {
+        getProviderMeta(providerId);
+      } catch (e) {
+        setRows((prev) => [...prev, { kind: "user", id, text: echoCommand }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
+        idRef.current++;
+        return;
+      }
+      const removed = await deleteApiKey(providerId);
+      // Dropping the in-process env copy makes /logout take effect immediately;
+      // a key exported in the shell still applies on next launch (pi behavior).
+      if (removed) delete process.env[getProviderMeta(providerId).envVar];
+      setAuthFlow(null);
+      const stillConfigured = (() => {
+        try {
+          getProvider(providerId);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      // If the user logged out the provider they are chatting with, drop back
+      // to the picker so the next message can't fail with a key error.
+      if (activeProvider?.name === providerId && !stillConfigured) {
+        setActiveProvider(null);
+        setAuthFlow({ step: "provider", mode: "login", selected: 0 });
+      }
+      setRows((prev) => [
+        ...prev,
+        { kind: "user", id, text: echoCommand },
+        { kind: "text", id: id + 1, text: removed ? `Removed stored API key for ${providerId}. Environment variables are unchanged.` : `No stored API key for ${providerId}.` },
+      ]);
+      idRef.current++;
+    },
+    [activeProvider, nextId],
+  );
+
   const submitPrompt = useCallback(
     async (prompt: string) => {
       const text = prompt.trim();
@@ -175,6 +279,24 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           setSession((s) => s + 1);
           return;
         }
+        if (slash.type === "login") {
+          const id = nextId();
+          if (!slash.arg) {
+            setRows((prev) => [...prev, { kind: "user", id, text }]);
+            idRef.current++;
+            openProviderPicker("login");
+          } else {
+            setRows((prev) => [...prev, { kind: "user", id, text }]);
+            idRef.current++;
+            openKeyPrompt(slash.arg);
+          }
+          return;
+        }
+        if (slash.type === "logout") {
+          if (!slash.arg) openProviderPicker("logout");
+          else await runLogout(slash.arg, text);
+          return;
+        }
         if (slash.type === "model") {
           const id = nextId();
           if (!slash.arg) {
@@ -190,7 +312,10 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
                 setActiveModel(info.id);
                 setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Switched to ${info.id} — history kept.` }]);
               } catch (e) {
+                // Missing key: route into the login flow like pi instead of
+                // leaving a bare error row.
                 setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
+                if (e instanceof MissingApiKeyError) openKeyPrompt(e.provider);
               }
             }
           }
@@ -236,6 +361,12 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         if (slash.type === "compact") {
           if (workingRef.current) return;
           const id = nextId();
+          if (!activeProvider) {
+            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Not logged in. Run /login to add an API key first." }]);
+            idRef.current++;
+            openProviderPicker("login");
+            return;
+          }
           if (messagesRef.current.length === 0) {
             setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Nothing to compact." }]);
             idRef.current++;
@@ -278,6 +409,13 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
       }
 
       const userId = nextId();
+      // No key yet: route into the picker instead of failing the request.
+      if (!activeProvider) {
+        setRows((prev) => [...prev, { kind: "user", id: userId, text }, { kind: "text", id: userId + 1, text: "Not logged in. Pick a provider to add its API key." }]);
+        idRef.current++;
+        if (!authFlow) openProviderPicker("login");
+        return;
+      }
       setRows((prev) => [...prev, { kind: "user", id: userId, text }]);
       messagesRef.current.push({ role: "user", content: text });
 
@@ -350,10 +488,49 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         }
       }
     },
-    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, nextId, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, exit, activeModel, activeProvider, authFlow, nextId, openKeyPrompt, openProviderPicker, runLogout, sessionId, system, tools],
   );
 
   useInput((input, key) => {
+    // Auth picker owns the keyboard while it is up (pi: selector replaces editor).
+    if (authFlow?.step === "provider") {
+      const options = listProviders();
+      if (key.upArrow) {
+        setAuthFlow((prev) => (prev?.step === "provider" ? { ...prev, selected: (prev.selected + options.length - 1) % options.length } : prev));
+        return;
+      }
+      if (key.downArrow) {
+        setAuthFlow((prev) => (prev?.step === "provider" ? { ...prev, selected: (prev.selected + 1) % options.length } : prev));
+        return;
+      }
+      if (key.return) {
+        const current = authFlow;
+        const picked = options[current.selected];
+        if (!picked) return;
+        if (current.mode === "login") {
+          setKeyDraft("");
+          setAuthError(null);
+          setAuthFlow({ step: "key", providerId: picked.id, envVar: picked.envVar });
+        } else {
+          void runLogout(picked.id, `/logout ${picked.id}`);
+        }
+        return;
+      }
+      // Esc closes the picker only once chatting is possible; at startup
+      // (no provider yet) there is nothing to go back to.
+      if (key.escape && activeProvider) {
+        setAuthFlow(null);
+        setAuthError(null);
+      }
+      return;
+    }
+    // Key prompt: TextInput owns typing; esc steps back to the picker.
+    if (authFlow?.step === "key" && key.escape) {
+      setAuthFlow({ step: "provider", mode: "login", selected: 0 });
+      setAuthError(null);
+      setKeyDraft("");
+      return;
+    }
     // Permission dialog owns the keyboard while it is up.
     if (pending) {
       const ch = input.toLowerCase();
@@ -368,11 +545,22 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
   });
 
   useEffect(() => {
-    if (!startedRef.current && initialPrompt) {
+    // Startup without a key (or a logged-out switch): open the key prompt
+    // for the requested provider, like pi's first-run /login.
+    // Gated on live state (not the initial prop): after a successful login
+    // activeProvider is set, so this must not fire again when the flow closes.
+    if (!activeProvider && initialSetup && !authFlow) {
+      setAuthFlow({ step: "key", providerId: initialSetup.providerName, envVar: initialSetup.envVar });
+    }
+  }, [activeProvider, initialSetup, authFlow]);
+
+  useEffect(() => {
+    // Don't fire the pending prompt until login completes.
+    if (!startedRef.current && initialPrompt && activeProvider) {
       startedRef.current = true;
       void submitPrompt(initialPrompt);
     }
-  }, [initialPrompt, submitPrompt]);
+  }, [initialPrompt, submitPrompt, activeProvider]);
 
   // Only the last row ever mutates (streaming text appends to it,
   // tool status flips on it). Everything before it is final, so it
@@ -397,6 +585,45 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
         {(row) => renderRow(row)}
       </Static>
       {live && renderRow(live)}
+      {authFlow?.step === "provider" && (
+        <Box marginTop={1} flexDirection="column">
+          <Text bold>{authFlow.mode === "login" ? "Select a provider to log in:" : "Select a provider to log out:"}</Text>
+          {listProviders().map((p, i) => {
+            const selected = i === authFlow.selected;
+            const saved = getStoredKeySync(p.id) ? "  ✓ saved" : "";
+            return (
+              <Text key={p.id} color={selected ? "cyan" : undefined} dimColor={!selected}>
+                {selected ? "→ " : "  "}{p.label} <Text dimColor>({p.id}){saved}</Text>
+              </Text>
+            );
+          })}
+          <Text dimColor>↑↓ navigate · enter select{activeProvider ? " · esc cancel" : ""}</Text>
+        </Box>
+      )}
+      {authFlow?.step === "key" && (
+        <Box marginTop={1} flexDirection="column">
+          <Text bold>Login to {authFlow.providerId}</Text>
+          <Text dimColor>Paste {authFlow.envVar} — saved to {getAuthPath()}</Text>
+          <Box marginTop={1}>
+            <Text dimColor>› </Text>
+            <TextInput
+              value={keyDraft}
+              onChange={setKeyDraft}
+              onSubmit={(value) => {
+                void submitKey(authFlow.providerId, value);
+              }}
+              placeholder="sk-…"
+              mask="*"
+            />
+          </Box>
+          {authError && (
+            <Box marginTop={1}>
+              <Text color="red">✕ {authError}</Text>
+            </Box>
+          )}
+          <Text dimColor>enter save · esc back</Text>
+        </Box>
+      )}
       {pending && (
         <Box marginTop={1} flexDirection="column">
           <Text color="yellow">Permission needed: {shortLabel(pending.name, pending.input)}</Text>
@@ -408,21 +635,25 @@ export default function App({ provider, model, system, tools, initialPrompt, yol
           <Text color="red">✕ {error}</Text>
         </Box>
       )}
-      <Box marginTop={1}>
-        <Text dimColor={working}>› </Text>
-        <TextInput
-          value={draft}
-          onChange={setDraft}
-          onSubmit={(value) => {
-            if (pending) return;
-            setDraft("");
-            void submitPrompt(value);
-          }}
-          placeholder={pending ? "answer y/a/n…" : working ? "working…" : "Ask nimi…"}
-        />
-      </Box>
+      {!authFlow && (
+        <Box marginTop={1}>
+          <Text dimColor={working}>› </Text>
+          <TextInput
+            value={draft}
+            onChange={setDraft}
+            onSubmit={(value) => {
+              if (pending) return;
+              setDraft("");
+              void submitPrompt(value);
+            }}
+            placeholder={pending ? "answer y/a/n…" : working ? "working…" : activeProvider ? "Ask nimi…" : "Run /login…"}
+          />
+        </Box>
+      )}
       <Box>
-        <Text dimColor>{working ? "working… esc to interrupt" : "enter send · /help /clear /quit · esc interrupt"}</Text>
+        <Text dimColor>
+          {authFlow ? "login flow · esc back" : working ? "working… esc to interrupt" : "enter send · /login /model /help · esc interrupt"}
+        </Text>
       </Box>
     </Box>
   );

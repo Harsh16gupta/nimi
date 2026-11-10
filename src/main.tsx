@@ -5,7 +5,9 @@ import { parseArgs, printHelp, printVersion } from "./cli/arg.ts";
 import { buildSystemPrompt } from "./config/system-prompt.ts";
 import { loadSettings } from "./config/settings.ts";
 import { allowAll, createPromptPermission } from "./permissions.ts";
-import { getProvider } from "./providers/index.ts";
+import { MissingApiKeyError, getProvider, getProviderDefaultModel } from "./providers/index.ts";
+import { saveApiKey } from "./config/auth.ts";
+import type { Provider } from "./types.ts";
 import { appendEntry, appendMessages, listSessions, loadSession, newSessionId } from "./session/store.ts";
 import { createTraceRecorder, withTrace } from "./trace/recorder.ts";
 import { ALL_TOOLS } from "./tools/index.ts";
@@ -35,12 +37,9 @@ if (args.version) {
 }
 
 const settings = await loadSettings();
-// Precedence: CLI flag > project settings > global settings > env > default.
-const provider = getProvider(args.provider ?? settings.provider ?? "meta");
-const model = args.model ?? settings.model ?? provider.defaultModel;
-const system = await buildSystemPrompt(settings.systemPromptExtra);
 
-// List saved sessions (id + date + first prompt) newest first, then exit.
+// --list-sessions needs no provider, so it runs before key resolution
+// (a missing key must not block listing saved sessions).
 if (args.listSessions) {
   const ids = await listSessions();
   if (ids.length === 0) console.log("No saved sessions yet.");
@@ -60,10 +59,46 @@ if (args.listSessions) {
   process.exit(0);
 }
 
+// Precedence: CLI flag > project settings > global settings > env > default.
+// A missing key is NOT fatal here: interactive modes open the /login wizard
+// (pi behavior) instead of crashing before the TUI renders.
+const providerName = args.provider ?? settings.provider ?? "meta";
+let provider: Provider | null = null;
+let missingAuth: { providerName: string; envVar: string } | null = null;
+let model: string;
+try {
+  provider = getProvider(providerName);
+  model = args.model ?? settings.model ?? provider.defaultModel;
+} catch (e) {
+  if (e instanceof MissingApiKeyError) {
+    missingAuth = { providerName: e.provider, envVar: e.envVar };
+    try {
+      model = args.model ?? settings.model ?? getProviderDefaultModel(providerName);
+    } catch (unknownProvider) {
+      console.error(unknownProvider instanceof Error ? unknownProvider.message : String(unknownProvider));
+      process.exit(1);
+    }
+  } else {
+    console.error(e instanceof Error ? e.message : String(e));
+    process.exit(1);
+  }
+}
+const system = await buildSystemPrompt(settings.systemPromptExtra);
+
 // Piped / non-interactive: keep the old one-shot behavior so scripts
 // and non-TTY environments still work. --print forces it in a TTY too.
 // --classic always wins: an explicit REPL request beats pipe detection.
 if (!args.classic && (args.print || !process.stdin.isTTY || !process.stdout.isTTY)) {
+  // Headless: no wizard possible, so a missing key is a hard error with
+  // the interactive fix attached (pi prints its /login hint here too).
+  if (missingAuth) {
+    console.error(`No API key found for ${missingAuth.providerName}. Set ${missingAuth.envVar}, or run "nimi" interactively and use /login ${missingAuth.providerName}.`);
+    process.exit(1);
+  }
+  if (!provider) {
+    console.error("No provider configured.");
+    process.exit(1);
+  }
   if (!args.prompt) {
     console.error('No prompt given. Run "nimi --help" for usage.');
     process.exit(1);
@@ -152,15 +187,38 @@ if (args.session) {
 } else {
   tuiSessionId = newSessionId();
   tuiMessages = [];
-  await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: provider.name });
+  await appendEntry(tuiSessionId, { type: "session_info", id: tuiSessionId, created_at: new Date().toISOString(), model, provider: provider?.name ?? providerName });
 }
 
 if (args.classic) {
+  // Classic REPL can't render the Ink wizard: ask for the key inline once,
+  // save it to ~/.nimi/auth.json, then continue with the normal loop.
+  if (!provider && missingAuth) {
+    const askRl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer: string = await new Promise((resolve) => askRl.question(`No API key for ${missingAuth.providerName}. Enter ${missingAuth.envVar} (saved to ~/.nimi/auth.json): `, resolve));
+    askRl.close();
+    if (!answer.trim()) {
+      console.error(`No API key given. Set ${missingAuth.envVar} or run "nimi" and use /login.`);
+      process.exit(1);
+    }
+    await saveApiKey(missingAuth.providerName, answer.trim());
+    try {
+      provider = getProvider(missingAuth.providerName);
+      model = args.model ?? settings.model ?? provider.defaultModel;
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : String(e));
+      process.exit(1);
+    }
+  }
+  if (!provider) {
+    console.error("No provider configured.");
+    process.exit(1);
+  }
   const { runClassic } = await import("./modes/classic.ts");
   await runClassic({ provider, model, system, tools: ALL_TOOLS, sessionId: tuiSessionId, initialMessages: tuiMessages, yolo: args.yolo, contextLimit: args.contextLimit, tracePath: args.trace });
   process.exit(0);
 }
 
 render(
-  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} contextLimit={args.contextLimit} />,
+  <App provider={provider} model={model} system={system} tools={ALL_TOOLS} initialPrompt={args.prompt} yolo={args.yolo} sessionId={tuiSessionId} initialMessages={tuiMessages} contextLimit={args.contextLimit} initialSetup={missingAuth} />,
 );

@@ -1,7 +1,8 @@
 import { createInterface } from "node:readline";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
-import { getProvider } from "../providers/index.ts";
+import { MissingApiKeyError, getProvider, getProviderMeta } from "../providers/index.ts";
+import { deleteApiKey, getAuthPath, saveApiKey } from "../config/auth.ts";
 import { MODELS, getModelInfo } from "../providers/models.ts";
 import { allowAll, createPromptPermission } from "../permissions.ts";
 import { appendMessages, listSessions, loadSession } from "../session/store.ts";
@@ -26,7 +27,8 @@ export type ClassicOptions = {
 // Plain readline loop for when Ink can't run. Same generator, same
 // slash parser, prompt-permission via readline y/a/n.
 export async function runClassic(opts: ClassicOptions): Promise<void> {
-    let provider = opts.provider;
+    // Nullable: /logout of the active provider drops it until /login or /model.
+    let provider: Provider | null = opts.provider;
     let model = opts.model;
     const messages: Message[] = [...opts.initialMessages];
     let saved = messages.length;
@@ -36,6 +38,16 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
     // created on the first real prompt so the header names the task.
     let trace: TraceRecorder | null = null;
     const ask = (q: string): Promise<string> => new Promise((resolve) => rl.question(q, resolve));
+    // Inline /login for non-Ink environments: prompt, save to auth.json, retry.
+    const ensureKey = async (providerId: string): Promise<boolean> => {
+        try {
+            const meta = getProviderMeta(providerId);
+            const answer = (await ask(`Enter ${meta.envVar} for ${providerId} (saved to ${getAuthPath()}): `)).trim();
+            if (!answer) { console.log("Empty key — cancelled."); return false; }
+            await saveApiKey(providerId, answer);
+            return true;
+        } catch (e) { console.log(e instanceof Error ? e.message : String(e)); return false; }
+    };
     console.log(`nimi ${model} · session ${opts.sessionId.slice(-6)} · /help for commands`);
     if (messages.length > 0) console.log(`Resumed — ${messages.length} messages restored.`);
     if (opts.yolo) console.log("Permission prompts off (--yolo).");
@@ -54,6 +66,7 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
                 continue;
             }
             if (slash.type === "compact") {
+                if (!provider) { console.log("Not logged in. Use /login <provider> first."); continue; }
                 const result = await compactMessages(messages, provider, model);
                 if (!result.compacted) console.log("History is already short.");
                 else { messages.length = 0; messages.push(...result.messages); console.log("Compacted. Summary:\n" + result.summary); }
@@ -67,8 +80,43 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
                     if (!info) console.log(`Unknown model: ${slash.arg}`);
                     else {
                         try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} — history kept.`); }
-                        catch (e) { console.log(e instanceof Error ? e.message : String(e)); }
+                        catch (e) {
+                            console.log(e instanceof Error ? e.message : String(e));
+                            if (e instanceof MissingApiKeyError && await ensureKey(e.provider)) {
+                                try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} — history kept.`); }
+                                catch (retry) { console.log(retry instanceof Error ? retry.message : String(retry)); }
+                            }
+                        }
                     }
+                }
+                continue;
+            }
+            if (slash.type === "login") {
+                if (!slash.arg) { console.log("Usage: /login <provider>"); continue; }
+                try { getProviderMeta(slash.arg); }
+                catch (e) { console.log(e instanceof Error ? e.message : String(e)); continue; }
+                if (await ensureKey(slash.arg)) {
+                    try {
+                        provider = getProvider(slash.arg);
+                        const current = getModelInfo(model);
+                        model = current?.provider === slash.arg ? model : provider.defaultModel;
+                        console.log(`Logged in to ${slash.arg}. Credentials saved to ${getAuthPath()}.`);
+                    }
+                    catch (e) { console.log(e instanceof Error ? e.message : String(e)); }
+                }
+                continue;
+            }
+            if (slash.type === "logout") {
+                if (!slash.arg) { console.log("Usage: /logout <provider>"); continue; }
+                try { getProviderMeta(slash.arg); }
+                catch (e) { console.log(e instanceof Error ? e.message : String(e)); continue; }
+                const removed = await deleteApiKey(slash.arg);
+                console.log(removed ? `Removed stored API key for ${slash.arg}. Environment variables are unchanged.` : `No stored API key for ${slash.arg}.`);
+                // Take effect immediately when the active provider was logged out:
+                // keep going on its env key if one exists, else require /login.
+                if (provider?.name === slash.arg) {
+                    try { provider = getProvider(slash.arg); }
+                    catch { provider = null; console.log(`Logged out of ${slash.arg} — add a key with /login or switch with /model.`); }
                 }
                 continue;
             }
@@ -89,6 +137,7 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
             console.log(`Unknown command: ${(slash as { name: string }).name}. Try /help.`);
             continue;
         }
+        if (!provider) { console.log("Not logged in. Use /login <provider> first."); continue; }
         messages.push({ role: "user", content: line });
         if (opts.tracePath && !trace) {
             trace = createTraceRecorder(opts.tracePath, {

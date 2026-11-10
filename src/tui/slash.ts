@@ -1,4 +1,4 @@
-// Minimal slash commands: help/clear/compact/context/model/tools/sessions/session/quit.
+// Minimal slash commands: help/clear/compact/context/model/login/logout/tools/sessions/session/quit.
 
 export type SlashAction =
   | { type: "help" }
@@ -6,6 +6,8 @@ export type SlashAction =
   | { type: "compact" }
   | { type: "context" }
   | { type: "model"; arg: string }
+  | { type: "login"; arg: string }
+  | { type: "logout"; arg: string }
   | { type: "tools" }
   | { type: "sessions" }
   | { type: "session" }
@@ -36,6 +38,8 @@ function nameToAction(name: string, arg = ""): SlashAction {
   if (name === "compact") return { type: "compact" };
   if (name === "context") return { type: "context" };
   if (name === "model") return { type: "model", arg: arg.trim() };
+  if (name === "login") return { type: "login", arg: arg.trim() };
+  if (name === "logout") return { type: "logout", arg: arg.trim() };
   if (name === "tools") return { type: "tools" };
   if (name === "sessions") return { type: "sessions" };
   if (name === "session") return { type: "session" };
@@ -50,6 +54,8 @@ export const HELP_TEXT =
   "  /compact   Summarize old history to free context\n" +
   "  /context   Show token usage vs the window\n" +
   "  /model [id]  List models, or switch (keeps history)\n" +
+  "  /login [provider]  Sign in with an API key (saved to ~/.nimi/auth.json)\n" +
+  "  /logout [provider] Remove a saved API key\n" +
   "  /tools     List the tools the model can call\n" +
   "  /sessions  List saved sessions\n" +
   "  /session   Show this session's resume command\n" +
