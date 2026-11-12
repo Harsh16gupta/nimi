@@ -1120,3 +1120,450 @@ select:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+
+
+.nimi-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--nimi-klein);
+  color: #fff;
+  border-bottom: 1px solid var(--nimi-klein-dark);
+}
+
+.nimi-topbar-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  padding: 0 var(--spacing-12);
+}
+
+.nimi-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
+  min-width: 0;
+}
+
+
+.nimi-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  color: #fff;
+  text-decoration: none;
+}
+
+
+.nimi-topbar-mark {
+  width: 28px;
+  height: 28px;
+  display: block;
+  border-radius: 4px;
+  background: #fff;
+}
+
+
+.nimi-topbar-word {
+  font-family: var(--font-family-code);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  font-size: var(--font-size-sm);
+}
+
+
+.nimi-topbar-version {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 0 var(--spacing-1-5);
+}
+
+
+.nimi-topbar-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+
+.nimi-topbar-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-1-5);
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  padding: var(--spacing-1-5) var(--spacing-3);
+  border-radius: var(--radius-element);
+}
+
+
+.nimi-topbar-tab:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+
+.nimi-topbar-tab.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+
+.nimi-topbar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+}
+
+
+.nimi-topbar-tab:not(.is-active) .nimi-topbar-dot {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+
+.nimi-topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+
+.nimi-topbar-link {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.9);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+
+.nimi-topbar-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+
+.nimi-topbar-install {
+  font-family: var(--font-family-code);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--nimi-klein);
+  background: #fff;
+  border: none;
+  border-radius: var(--radius-element);
+  padding: var(--spacing-1-5) var(--spacing-3);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+
+.nimi-topbar-install:hover {
+  background: var(--nimi-paper-off);
+}
+
+
+.nimi-run-header-blue {
+  background: var(--nimi-paper-off);
+  border-bottom: 1px solid var(--color-border);
+}
+
+
+.nimi-run-header-blue .nimi-run-sample-name {
+  color: var(--nimi-klein);
+}
+
+
+.nimi-playground-main .nimi-canvas {
+  background-color: var(--nimi-ink);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.13) 1px, transparent 1px);
+}
+
+@media (max-width: 980px) {
+  .nimi-topbar-inner {
+    padding: 0 var(--spacing-3);
+    flex-wrap: wrap;
+    padding-top: var(--spacing-2);
+    padding-bottom: var(--spacing-2);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Playground chrome — idea.html transport bar, run band, dark graph frame
+   -------------------------------------------------------------------------- */
+
+.ih-transport {
+  background: #fff;
+  gap: var(--spacing-3) var(--spacing-4);
+}
+
+.ih-transport-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1-5);
+  flex-wrap: wrap;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.ih-step-counter {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nimi-klein);
+  background: rgba(3, 0, 235, 0.08);
+  border: 1px solid rgba(3, 0, 235, 0.2);
+  border-radius: 4px;
+  padding: 5px 12px;
+  min-width: 70px;
+  text-align: center;
+}
+
+.ih-step-btn {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 14px;
+  color: #334155;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.ih-step-btn:hover {
+  background: #f1f5f9;
+}
+
+.ih-play-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--nimi-klein);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  cursor: pointer;
+  min-width: 90px;
+  justify-content: center;
+}
+
+.ih-play-btn:hover {
+  background: var(--nimi-klein-dark);
+}
+
+.ih-transport-groups {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.ih-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--nimi-paper-off);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.ih-pill-label {
+  font-size: 10px;
+  color: #94a3b8;
+  padding: 0 4px;
+}
+
+.ih-pill-btn {
+  font-family: inherit;
+  font-size: 12px;
+  color: #475569;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.ih-pill-btn:hover {
+  color: #0f172a;
+}
+
+.ih-pill-btn.is-active {
+  color: #fff;
+  background: var(--nimi-klein);
+  font-weight: 700;
+}
+
+.ih-pill-allow.is-active {
+  background: #059669;
+}
+
+.ih-pill-deny.is-active {
+  background: #e11d48;
+}
+
+.ih-transport-hint {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* run band */
+.ih-runband {
+  background: var(--nimi-paper-off);
+}
+
+.ih-runband-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.ih-runband-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ih-sample-pill {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--nimi-klein);
+  border-radius: 4px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.ih-runband-title {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 600;
+  font-size: 24px;
+  color: var(--nimi-klein);
+  margin: 0;
+}
+
+.ih-runband-meta {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: #475569;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ih-runband-note {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
+
+.ih-runband-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: #64748b;
+  flex: 0 1 280px;
+  min-width: 220px;
+}
+
+.ih-runband-picker select {
+  flex: 1;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: #0f172a;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 6px 12px;
+}
+
+.ih-runband-picker select:focus {
+  outline: none;
+  border-color: var(--nimi-klein);
+}
+
+/* dark graph frame to match the preview panels */
+.nimi-playground-main {
+  background: var(--nimi-ink);
+}
+
+.nimi-workbench-heading {
+  background: rgba(20, 24, 34, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nimi-workbench-heading span {
+  color: #e2e8f0 !important;
+}
+
+.nimi-canvas-bar {
+  background: rgba(20, 24, 34, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nimi-canvas-hint {
+  background: var(--nimi-ink-card);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
+.nimi-playground-footer {
+  background: var(--nimi-ink-card);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nimi-playground-footer span {
+  color: #94a3b8 !important;
+}
+
+.nimi-step-block.current {
+  background: var(--nimi-klein);
+  border-color: #6d6aff;
+}
+
+@media (max-width: 980px) {
+  .ih-transport-groups {
+    margin-left: 0;
+  }
+
+  .ih-transport-hint {
+    display: none;
+  }
+
+  .ih-runband-meta {
+    white-space: normal;
+  }
+}

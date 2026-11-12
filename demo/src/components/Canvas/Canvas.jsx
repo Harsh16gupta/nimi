@@ -117,7 +117,7 @@ export default function Canvas({
           ...n,
           title: "render(<App />)",
           sub: "src/tui/App.tsx · Ink",
-          file: "src/main.tsx:164",
+          file: "src/tui/App.tsx:41",
         };
       }
       if (uiMode === "classic") {
@@ -125,7 +125,7 @@ export default function Canvas({
           ...n,
           title: "runClassic()",
           sub: "src/modes/classic.ts",
-          file: "src/modes/classic.ts:20",
+          file: "src/modes/classic.ts:30",
         };
       }
       return n;

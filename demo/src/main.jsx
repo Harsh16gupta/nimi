@@ -9,7 +9,7 @@ import "./styles/nimi.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <Theme theme={themes[defaultThemeSlug]} mode="dark">
+    <Theme theme={themes[defaultThemeSlug]} mode="light">
       <App />
     </Theme>
   </StrictMode>,

@@ -25,18 +25,18 @@ const PINNED_DOCS = {
   main: {
     phase: "ENTRY",
     phaseId: "entry",
-    fnTitle: "main() — CLI & mode router",
-    fileRef: "src/main.tsx:18",
+    fnTitle: "src/main.tsx — entry & mode router",
+    fileRef: "src/main.tsx:22",
     explanation:
-      "Loads .env beside the binary, parses CLI flags, merges global and project settings, builds the system prompt, initializes or resumes the .nimi/sessions/<id>.jsonl file, and routes to print, classic REPL, or Ink TUI.",
+      "Loads .env from the current working directory, parses CLI flags, merges global and project settings, builds the system prompt, initializes or resumes the .nimi/sessions/<id>.jsonl file, and routes to print, classic REPL, or Ink TUI.",
   },
   parseArgs: {
     phase: "CONFIG",
     phaseId: "config",
     fnTitle: "parseArgs(process.argv.slice(2))",
-    fileRef: "src/cli/arg.ts:18",
+    fileRef: "src/cli/arg.ts:21",
     explanation:
-      "Zero-dependency flag parser supporting both --flag value and --flag=value forms for -p, --provider, --model, --session, --list-sessions, --context-limit, --trace, --classic, --print, and --yolo.",
+      "Zero-dependency flag parser supporting both --flag value and --flag=value forms for -p/--prompt, -z/--provider, --model, --session, --list-sessions, --context-limit, --trace, --classic, --print, and --yolo.",
   },
   loadSettings: {
     phase: "CONFIG",
@@ -211,8 +211,8 @@ export default function Inspector({
 
         <TabList value={tab} onChange={setTab} size="sm" role="tablist" hasDivider>
           <Tab value="summary" label="Overview" panelId="inspector-panel-summary" />
-          <Tab value="events" label={`${view.events.length} Events`} panelId="inspector-panel-events" />
-          <Tab value="messages" label={`Context ${messagesList.length}`} panelId="inspector-panel-messages" />
+          <Tab value="events" label="Events" panelId="inspector-panel-events" />
+          <Tab value="messages" label="Context" panelId="inspector-panel-messages" />
           <Tab value="source" label="Source" panelId="inspector-panel-source" />
         </TabList>
 

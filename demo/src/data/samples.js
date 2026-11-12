@@ -16,7 +16,7 @@ export const SAMPLE_RUNS = [
     id: "showcase-deny",
     title: "Permission gate in action",
     description:
-      "The same TODO run with the write permission denied. Nimi stops the tool, records an error result, and exits cleanly.",
+      "The same TODO run with the write permission denied. Nimi stops the tool and records an error result instead of writing; the replay stops at the gate.",
     output: "print",
     branch: "deny",
     tags: ["permissions", "deny branch"],

@@ -9,7 +9,7 @@ import { Text } from "@astryxdesign/core/Text";
 
 const SPEEDS = ["0.5x", "1x", "2x"];
 
-export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view }) {
+export default function Timeline({ pos, go, max, denyLimit, speed, setSpeed, stepInfo, view }) {
   const done = max > 0 ? Math.round(((pos.index + 1) / (max + 1)) * 100) : 0;
 
   return (
@@ -22,8 +22,8 @@ export default function Timeline({ pos, go, max, speed, setSpeed, stepInfo, view
               {turn.steps.map((s) => {
                 const idx = s.itemIndex ?? s.key;
                 const isCurrent = idx === pos.index;
-                const isTruncated = pos.branch === "deny" && idx > 13;
-                const isDenyGate = pos.branch === "deny" && idx === 13;
+                const isTruncated = pos.branch === "deny" && idx > denyLimit;
+                const isDenyGate = pos.branch === "deny" && idx === denyLimit;
                 let cls = "nimi-step-block";
                 if (isCurrent) cls += " current";
                 else if (idx < pos.index) cls += " past";

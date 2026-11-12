@@ -50,6 +50,18 @@ export function isGated(header, name) {
   return true; // unknown tools ask, same as the agent
 }
 
+// Index of the first gated tool_end: where the deny branch fires.
+// Unknown tools count as gated, same as the agent (src/agent.ts).
+export function findDenyLimit(parsed) {
+  for (let i = 0; i < parsed.items.length; i++) {
+    const { obj } = parsed.items[i];
+    if (obj.type === "event" && obj.event.type === "tool_end" && isGated(parsed.header, obj.event.name)) {
+      return i;
+    }
+  }
+  return parsed.items.length - 1;
+}
+
 // Fold items[0..index] into view state. The deny branch is a toggle input
 // to the fold, not a second recording: at the first gated tool call the
 // fold injects the deny error result and stops (later lines belong to the

@@ -21,13 +21,13 @@ export const nimiTheme = defineTheme({
     "--color-text-secondary": ["#4E606F", "#9CA0A8"],
     "--color-text-tertiary": ["#7A8795", "#6B6F77"],
 
-    // Primary accent: muted blue
-    "--color-accent": ["#2563EB", "#3B82F6"],
-    "--color-accent-muted": ["#3B82F61A", "#3B82F626"],
+    // Primary accent: klein blue (idea.html design pattern)
+    "--color-accent": ["#0300EB", "#3835FF"],
+    "--color-accent-muted": ["#0300EB14", "#3835FF2E"],
     "--color-on-accent": ["#FFFFFF", "#FFFFFF"],
-    "--color-text-accent": ["#1D4ED8", "#60A5FA"],
-    "--color-icon-accent": ["#2563EB", "#60A5FA"],
-    "--color-border-accent": ["#BFDBFE", "#3B82F6"],
+    "--color-text-accent": ["#0300EB", "#7D7AFF"],
+    "--color-icon-accent": ["#0300EB", "#7D7AFF"],
+    "--color-border-accent": ["#D6DCF5", "#3835FF"],
 
     // Semantic fills
     "--color-success": ["#16A34A", "#22C55E"],
@@ -41,8 +41,8 @@ export const nimiTheme = defineTheme({
     "--color-on-error": ["#FFFFFF", "#0A1317"],
 
     // Border
-    "--color-border": ["#E5E7EB", "#27272A"],
-    "--color-border-emphasized": ["#D1D5DB", "#3F3F46"],
+    "--color-border": ["#D6DCF5", "#27272A"],
+    "--color-border-emphasized": ["#B9C2F0", "#3F3F46"],
 
     // Overlay
     "--color-overlay": ["#01122866", "#00000080"],
@@ -56,7 +56,7 @@ export const nimiTheme = defineTheme({
     "--nimi-graph-node-hover": ["#EFF6FF", "#1E293B"],
     "--nimi-graph-node-active": ["#EFF6FF", "#1E293B"],
     "--nimi-graph-edge": ["#CBD5E1", "#3F3F46"],
-    "--nimi-graph-edge-active": ["#3B82F6", "#60A5FA"],
+    "--nimi-graph-edge-active": ["#0300EB", "#7D7AFF"],
     "--nimi-graph-zone": ["#F8FAFC", "#141416"],
     "--nimi-graph-zone-border": ["#E2E8F0", "#27272A"],
     "--nimi-graph-text": ["#1E293B", "#E2E8F0"],
@@ -72,6 +72,13 @@ export const nimiTheme = defineTheme({
     "--nimi-panel": ["#FFFFFF", "#141416"],
     "--nimi-panel-elevated": ["#FFFFFF", "#18181B"],
     "--nimi-canvas-dots": ["#CBD5E1", "#27272A"],
+
+    // idea.html surfaces: klein blue header, ink graph panel, paper washes
+    "--nimi-klein": ["#0300EB", "#0300EB"],
+    "--nimi-klein-dark": ["#0200BA", "#0200BA"],
+    "--nimi-ink": ["#0B0D12", "#0B0D12"],
+    "--nimi-ink-card": ["#141822", "#141822"],
+    "--nimi-paper-off": ["#F7F8FC", "#F7F8FC"],
   },
   components: {
     button: {

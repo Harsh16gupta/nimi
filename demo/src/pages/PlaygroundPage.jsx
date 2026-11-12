@@ -3,29 +3,16 @@
 // and a persistent timeline footer. The replay semantics (trace fold,
 // allow/deny branches, URL state) are unchanged.
 import { useEffect, useMemo, useState } from "react";
-import { Badge } from "@astryxdesign/core/Badge";
-import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import Canvas from "../components/Canvas/Canvas.jsx";
 import Inspector from "../components/Inspector/Inspector.jsx";
 import Timeline from "../components/Timeline/Timeline.jsx";
 import Toolbar from "../components/Toolbar/Toolbar.jsx";
-import { replay, turnTokens } from "../data/trace.js";
+import { replay, turnTokens, findDenyLimit } from "../data/trace.js";
 import { describeStep } from "../data/architecture.js";
 import { SAMPLE_RUNS, matchSample } from "../data/samples.js";
 
 const SPEEDS = { "0.5x": 800, "1x": 380, "2x": 180 };
-
-function findDenyLimit(parsed) {
-  for (let i = 0; i < parsed.items.length; i++) {
-    const { obj } = parsed.items[i];
-    if (obj.type === "event" && obj.event.type === "tool_end") {
-      // write is the only gated tool in the showcase trace
-      if (obj.event.name === "write") return i;
-    }
-  }
-  return parsed.items.length - 1;
-}
 
 function readParams() {
   const hash = window.location.hash.slice(1);
@@ -152,30 +139,29 @@ export default function PlaygroundPage({ parsed }) {
 
   return (
     <div className="nimi-playground">
-      <div className="nimi-run-header">
-        <div className="nimi-run-identity">
-          <div className="nimi-run-title-row">
-            <Text type="body" weight="semibold" className="nimi-run-sample-name">
-              {currentSample.title}
-            </Text>
-            <Badge label="Sample replay" tone="info" size="sm" />
+      <div className="nimi-run-header ih-runband">
+        <div className="ih-runband-identity">
+          <div className="ih-runband-title-row">
+            <span className="ih-sample-pill">SAMPLE REPLAY</span>
+            <h1 className="ih-runband-title">{currentSample.title}</h1>
           </div>
-          <Text type="label" color="secondary" className="nimi-mono nimi-run-meta">
+          <p className="ih-runband-meta">
             {parsed.header.provider} / {parsed.header.model} · “{parsed.header.prompt}”
-          </Text>
-          <Text type="label" color="secondary" className="nimi-run-note">
+          </p>
+          <p className="ih-runband-note">
             Bundled trace replay — Allow / Deny only switches the replay branch. Nothing here
             touches a live machine.
-          </Text>
+          </p>
         </div>
-        <div className="nimi-run-sample-picker">
-          <Selector
-            label="Sample run"
-            value={currentSample.id}
-            onChange={handleSampleChange}
-            options={SAMPLE_RUNS.map((s) => ({ value: s.id, label: s.title }))}
-            size="sm"
-          />
+        <div className="ih-runband-picker">
+          <label htmlFor="ih-sample-select">Sample run:</label>
+          <select id="ih-sample-select" value={currentSample.id} onChange={(e) => handleSampleChange(e.target.value)}>
+            {SAMPLE_RUNS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <Toolbar
@@ -219,6 +205,7 @@ export default function PlaygroundPage({ parsed }) {
               pos={pos}
               go={go}
               max={max}
+              denyLimit={denyLimit}
               speed={speed}
               setSpeed={setSpeed}
               stepInfo={stepInfo}

@@ -1,15 +1,7 @@
 // Playground control row: transport, output lens, and replay permission branch.
-// The branch control only switches the replay fold — it never touches a live
-// machine. That limitation is stated in visible text, not just a tooltip.
-import { Button } from "@astryxdesign/core/Button";
-import { IconButton } from "@astryxdesign/core/IconButton";
-import { Icon } from "@astryxdesign/core/Icon";
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from "@astryxdesign/core/SegmentedControl";
-import { Text } from "@astryxdesign/core/Text";
-
+// Mirrors the idea.html transport bar: step counter pill, « ‹ play › »,
+// Lens pill group, replay-branch pill group, keyboard hint. The branch control
+// only switches the replay fold — it never touches a live machine.
 export default function Toolbar({
   pos,
   max,
@@ -20,84 +12,72 @@ export default function Toolbar({
   onBranchChange,
 }) {
   return (
-    <div className="nimi-toolbar" role="toolbar" aria-label="Replay controls">
-      <div className="nimi-toolbar-group" role="group" aria-label="Playback transport">
-        <Text type="label" color="secondary" className="nimi-mono" aria-live="off">
+    <div className="nimi-toolbar ih-transport" role="toolbar" aria-label="Replay controls">
+      <div className="ih-transport-stepper" role="group" aria-label="Playback transport">
+        <span className="ih-step-counter" aria-live="off">
           {pos.index + 1} / {max + 1}
-        </Text>
-        <IconButton
-          label="Restart from step 1"
-          icon={<Icon icon="chevronsLeft" />}
-          variant="ghost"
-          size="sm"
-          onClick={() => onGo(0)}
-          tooltip="Restart"
-        />
-        <IconButton
-          label="Previous step"
-          icon={<Icon icon="chevronLeft" />}
-          variant="ghost"
-          size="sm"
-          onClick={() => onGo(pos.index - 1)}
-          tooltip="Previous step (←)"
-        />
-        <Button
-          label={playing ? "❚❚ Pause" : "▶ Play"}
-          size="sm"
-          variant="primary"
+        </span>
+        <button type="button" className="ih-step-btn" title="First step" onClick={() => onGo(0)}>
+          «
+        </button>
+        <button type="button" className="ih-step-btn" title="Previous step (←)" onClick={() => onGo(pos.index - 1)}>
+          ‹
+        </button>
+        <button
+          type="button"
+          className="ih-play-btn"
           onClick={onTogglePlay}
-          tooltip="Play / pause (Space)"
-        />
-        <IconButton
-          label="Next step"
-          icon={<Icon icon="chevronRight" />}
-          variant="ghost"
-          size="sm"
-          onClick={() => onGo(pos.index + 1)}
-          tooltip="Next step (→)"
-        />
-      </div>
-
-      <div className="nimi-toolbar-spacer" />
-
-      <div className="nimi-toolbar-group nimi-toolbar-labeled">
-        <Text type="label" color="secondary" className="nimi-toolbar-caption">
-          Lens
-        </Text>
-        <SegmentedControl
-          label="Output lens"
-          value={pos.output}
-          onChange={onOutputChange}
-          size="sm"
+          title="Play / pause (Space)"
         >
-          <SegmentedControlItem value="print" label="Print" />
-          <SegmentedControlItem value="tui" label="TUI" />
-          <SegmentedControlItem value="classic" label="Classic" />
-        </SegmentedControl>
+          <span aria-hidden>{playing ? "❚❚" : "▶"}</span>
+          <span>{playing ? "Pause" : "Play"}</span>
+        </button>
+        <button type="button" className="ih-step-btn" title="Next step (→)" onClick={() => onGo(pos.index + 1)}>
+          ›
+        </button>
+        <button type="button" className="ih-step-btn" title="Last step" onClick={() => onGo(max)}>
+          »
+        </button>
       </div>
 
-      <div className="nimi-toolbar-divider" />
+      <div className="ih-transport-groups">
+        <div className="ih-pill-group" role="group" aria-label="Output lens">
+          <span className="ih-pill-label">Lens:</span>
+          {["print", "tui", "classic"].map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`ih-pill-btn${pos.output === m ? " is-active" : ""}`}
+              aria-pressed={pos.output === m}
+              onClick={() => onOutputChange(m)}
+            >
+              {m === "print" ? "Print" : m === "tui" ? "TUI" : "Classic"}
+            </button>
+          ))}
+        </div>
 
-      <div className="nimi-toolbar-group nimi-toolbar-labeled">
-        <Text type="label" color="secondary" className="nimi-toolbar-caption">
-          Replay branch
-        </Text>
-        <SegmentedControl
-          label="Replay permission branch (simulated)"
-          value={pos.branch}
-          onChange={onBranchChange}
-          size="sm"
-        >
-          <SegmentedControlItem value="allow" label="Allow" />
-          <SegmentedControlItem value="deny" label="Deny" />
-        </SegmentedControl>
+        <div className="ih-pill-group" role="group" aria-label="Replay permission branch (simulated)">
+          <span className="ih-pill-label">Replay branch:</span>
+          <button
+            type="button"
+            className={`ih-pill-btn ih-pill-allow${pos.branch === "allow" ? " is-active" : ""}`}
+            aria-pressed={pos.branch === "allow"}
+            onClick={() => onBranchChange("allow")}
+          >
+            Allow
+          </button>
+          <button
+            type="button"
+            className={`ih-pill-btn ih-pill-deny${pos.branch === "deny" ? " is-active" : ""}`}
+            aria-pressed={pos.branch === "deny"}
+            onClick={() => onBranchChange("deny")}
+          >
+            Deny
+          </button>
+        </div>
+
+        <span className="ih-transport-hint">Space plays · ←/→ step</span>
       </div>
-
-      <div className="nimi-toolbar-spacer" />
-
-      <Text type="label" color="secondary" className="nimi-toolbar-note">
-        Classic shortens previews · TUI marks the Ink node in the graph
-      </Text>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 // Nimi codebase architecture graph + live trace-to-architecture mapper.
 // Every node, file path, line number, and code snippet corresponds directly
 // to the real TypeScript files under src/.
+import { findDenyLimit } from "./trace.js";
 
 export const SUBSYSTEMS = [
   { id: "entry", label: "entry", color: "var(--nimi-violet)" },
@@ -34,9 +35,9 @@ export const ARCH_NODES = [
   // Col 1: Entry
   {
     id: "main",
-    title: "main()",
-    sub: "src/main.tsx",
-    file: "src/main.tsx:18",
+    title: "main.tsx",
+    sub: "entry script",
+    file: "src/main.tsx:22",
     group: "entry",
     x: 222,
     y: 256,
@@ -48,7 +49,7 @@ export const ARCH_NODES = [
     id: "parseArgs",
     title: "parseArgs()",
     sub: "src/cli/arg.ts",
-    file: "src/cli/arg.ts:18",
+    file: "src/cli/arg.ts:21",
     group: "config",
     x: 414,
     y: 54,
@@ -90,9 +91,9 @@ export const ARCH_NODES = [
   },
   {
     id: "runMode",
-    title: "runPrintMode()",
+    title: "print loop",
     sub: "src/main.tsx ·withTrace",
-    file: "src/main.tsx:106",
+    file: "src/main.tsx:150",
     group: "entry",
     x: 414,
     y: 334,
@@ -115,7 +116,7 @@ export const ARCH_NODES = [
     id: "terminal",
     title: "your terminal",
     sub: "AgentEvent → stdout",
-    file: "src/main.tsx:116",
+    file: "src/main.tsx:152",
     group: "renderer",
     x: 210,
     y: 392,
@@ -172,7 +173,7 @@ export const ARCH_NODES = [
     id: "getProvider",
     title: "getProvider()",
     sub: "src/providers/index.ts",
-    file: "src/providers/index.ts:21",
+    file: "src/providers/index.ts:55",
     group: "provider",
     x: 888,
     y: 256,
@@ -206,7 +207,7 @@ export const ARCH_NODES = [
     id: "streamEvent",
     title: "StreamEvent",
     sub: "text_delta · toolCall · done",
-    file: "src/providers/openai-compat.ts:99",
+    file: "src/providers/openai-compat.ts:101",
     group: "provider",
     x: 1134,
     y: 348,
@@ -227,7 +228,7 @@ export const ARCH_NODES = [
   // Col 6: Remote Model API & Local Tool Execution
   {
     id: "modelApi",
-    title: "Meta Muse API",
+    title: "Meta API",
     sub: "chat.completions.create",
     file: "src/providers/openai-compat.ts:71",
     group: "provider",
@@ -240,7 +241,7 @@ export const ARCH_NODES = [
     id: "toolExecute",
     title: "tool.execute()",
     sub: "fs · ripgrep · git spawn",
-    file: "src/agent.ts:155",
+    file: "src/agent.ts:153",
     group: "tools",
     x: 1378,
     y: 416,
@@ -319,11 +320,11 @@ export const ARCH_EDGES = [
 ];
 
 export const CODE_SNIPPETS = {
-  parseArgs: `// src/cli/arg.ts:18
+  parseArgs: `// src/cli/arg.ts:21
 export function parseArgs(argv: string[]): CliArgs {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    // Parses -p, --provider, --model, --session, --trace, --print, --yolo
+    // Parses -p/--prompt, -z/--provider, --model, --session, --trace, --print, --yolo
   }
   return args;
 }`,
@@ -333,12 +334,13 @@ export async function loadSettings(): Promise<Settings> {
   const project = await readJsonSafe(getProjectSettingsPath());
   const merged: Settings = { ...global, ...project };
   if (process.env.NIMI_PROVIDER) merged.provider = process.env.NIMI_PROVIDER;
+  if (process.env.NIMI_MODEL) merged.model = process.env.NIMI_MODEL;
   return merged;
 }`,
   buildSystemPrompt: `// src/config/system-prompt.ts:11
 export async function buildSystemPrompt(extra?: string): Promise<string> {
   const toolsList = ALL_TOOLS.map((t) => \`- \${t.name}: \${t.description}\`).join("\\n");
-  // Appends AGENTS.md / CLAUDE.md / .nimi/context.md if present in cwd
+  // Appends AGENTS.md / CLAUDE.md / .context / .nimi/context.md if present in cwd
   return base + toolsSection + contextSection + extraSection;
 }`,
   createSession: `// src/session/store.ts:25
@@ -390,7 +392,7 @@ if (toolToRun.readOnly !== true && options.canUseTool !== undefined) {
     continue;
   }
 }`,
-  toolExecute: `// src/agent.ts:155
+  toolExecute: `// src/agent.ts:153
 try {
   const output = await toolToRun.execute(call.arguments);
   options.messages.push({
@@ -404,7 +406,7 @@ export async function compactMessages(messages: Message[], provider: Provider, m
   const history = messages.slice(0, split).map(renderForSummary).join("\\n");
   // Summarizes head via provider.stream(), keeps recent turns verbatim
 }`,
-  appendMessages: `// src/main.tsx:132 & src/session/store.ts:30
+  appendMessages: `// src/main.tsx:167 & src/session/store.ts:30
 // runAgent mutates messages in place: persist only what this run added.
 await appendMessages(sessionId, messages.slice(before));`,
 };
@@ -416,8 +418,9 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
   const item = parsed.items[clamped];
   const { line, obj } = item;
 
-  // If the deny branch truncated earlier than index, describe the denial state
-  if (view.denied && clamped >= 12) {
+  // If the deny branch truncated earlier than index, describe the denial state.
+  // The gate fires at the first gated tool_end (write → NOTES.md here).
+  if (view.denied && clamped >= findDenyLimit(parsed)) {
     return {
       phase: "PERMISSIONS",
       phaseId: "permissions",
@@ -442,7 +445,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phaseId: "entry",
       shortPhase: "start",
       fnTitle: "parseArgs() → loadSettings() → runAgent()",
-      fileRef: "src/main.tsx:106",
+      fileRef: "src/main.tsx:22",
       traceLine: line,
       nodeId: "runAgent",
       secondaryNodes: ["shell", "main", "parseArgs", "loadSettings", "buildSystemPrompt", "createSession", "runMode"],
@@ -462,14 +465,14 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phaseId: "provider",
       shortPhase: `stream t${turnNum}`,
       fnTitle: `provider.stream({ model: "${parsed.header?.model ?? "muse-spark"}", messages })`,
-      fileRef: "src/providers/openai-compat.ts:99",
+      fileRef: "src/providers/openai-compat.ts:101",
       traceLine: line,
       nodeId: "streamEvent",
       secondaryNodes: ["providerStream", "modelApi", "runMode", "terminal"],
       edgeIds: ["e-prov-stream", "e-stream-api", "e-api-event", "e-mode-term"],
       edgeNote: `"${obj.event.delta}"`,
       explanation:
-        `Turn ${turnNum} streaming chunk from Meta Muse via OpenAI-compatible SSE. Each delta.content chunk is yielded immediately as { type: "text_delta" } so ${output === "print" ? "process.stdout.write()" : "the terminal renderer"} streams tokens live while tool_calls arguments buffer by index.`,
+        `Turn ${turnNum} streaming chunk from ${parsed.header?.provider ?? "the provider"} (${parsed.header?.model ?? "model"}) via OpenAI-compatible SSE. Each delta.content chunk is yielded immediately as { type: "text_delta" } so ${output === "print" ? "process.stdout.write()" : "the terminal renderer"} streams tokens live while tool_calls arguments buffer by index.`,
       snippet: CODE_SNIPPETS.providerStream,
     };
   }
@@ -480,7 +483,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phase: "AGENT LOOP",
       phaseId: "loop",
       shortPhase: "turn_end",
-      fnTitle: "decideByBlocks(reply.content) → toolCalls[]",
+      fnTitle: "reply.content → toolCalls[] (decide by blocks)",
       fileRef: "src/agent.ts:84",
       traceLine: line,
       nodeId: "assembleBlocks",
@@ -518,7 +521,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phaseId: "session",
       shortPhase: "snapshot",
       fnTitle: `trace.record(event, messages[${obj.messages.length}])`,
-      fileRef: "src/trace/recorder.ts:75",
+      fileRef: "src/trace/recorder.ts:70",
       traceLine: line,
       nodeId: "createSession",
       secondaryNodes: ["runMode", "runAgent"],
@@ -556,7 +559,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phaseId: "tools",
       shortPhase: `tool:${name}`,
       fnTitle: `${name}Tool.execute(${JSON.stringify(input)})`,
-      fileRef: `src/tools/${name}.ts:1`,
+      fileRef: `src/tools/${name}.ts`,
       traceLine: line,
       nodeId: "getTool",
       secondaryNodes: ["assembleBlocks", "canUseTool", "toolExecute"],
@@ -576,7 +579,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       phaseId: "tools",
       shortPhase: `res:${name}`,
       fnTitle: `toolToRun.execute() → "${name}" (${result.split("\n").length} lines)`,
-      fileRef: "src/agent.ts:155",
+      fileRef: "src/agent.ts:153",
       traceLine: line,
       nodeId: "toolExecute",
       secondaryNodes: ["runAgent", "terminal"],
@@ -600,7 +603,7 @@ export function describeStep(parsed, view, index, { output = "print", branch = "
       nodeId: "shouldCompact",
       secondaryNodes: ["runAgent", "providerStream"],
       edgeIds: ["e-agent-compact", "e-prov-stream"],
-      edgeNote: `${obj.event.before} → 2 msgs`,
+      edgeNote: `${obj.event.before} → ${obj.event.after} msgs`,
       explanation:
         "Before starting the next round, shouldCompact() estimates token usage (~chars/4) against 75% of the context window. findSafeSplit() walks backward so it never splits an assistant toolCall from its following toolResult, replacing the older prefix with a concise summary.",
       snippet: CODE_SNIPPETS.shouldCompact,
