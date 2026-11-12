@@ -59,7 +59,6 @@ export default function LandingPage() {
       </div>
 
       <Hero onCopy={showToast} />
-      <Preview />
       <Features />
       <Faq />
       <FinalCta onCopy={showToast} />
@@ -252,55 +251,6 @@ function Hero({ onCopy }) {
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
-
-/* ------------------------------------------------- architecture preview */
-
-function Preview() {
-  return (
-    <section className="ih-preview" aria-label="Sample replay preview">
-      <div className="ih-preview-bar">
-        <span className="ih-preview-bar-title">
-          <span className="ih-blue-dot" aria-hidden />
-          SAMPLE REPLAY · FIND ALL TODOS → NOTES.MD
-        </span>
-        <a href="#/playground" className="ih-preview-open">
-          OPEN INTERACTIVE REPLAY →
-        </a>
-      </div>
-      <div className="ih-preview-dark">
-        <div className="ih-preview-cards">
-          <div className="ih-pcard ih-pcard-loop">
-            <p className="ih-pcard-kicker">01 / GENERATOR LOOP</p>
-            <h3>runAgent()</h3>
-            <p className="ih-pcard-file">src/agent.ts</p>
-            <p className="ih-pcard-snippet">decide by blocks · agent.ts · toolCalls[]</p>
-            <p className="ih-pcard-live">
-              <span className="ih-ping" aria-hidden />
-              ACTIVE REPLAY STEP #04
-            </p>
-          </div>
-          <div className="ih-pcard ih-pcard-provider">
-            <p className="ih-pcard-kicker">02 / PROVIDER STREAM</p>
-            <h3>getProvider()</h3>
-            <p className="ih-pcard-file">src/providers/openai-compat.ts</p>
-            <p className="ih-pcard-snippet">OpenAI-compatible · chat.completions.create</p>
-            <p className="ih-pcard-dim">StreamEvent text_delta · toolCall · done</p>
-          </div>
-          <div className="ih-pcard ih-pcard-gate">
-            <p className="ih-pcard-kicker">03 / PERMISSION GATE</p>
-            <h3>canUseTool()</h3>
-            <p className="ih-pcard-file">src/permissions.ts</p>
-            <p className="ih-pcard-snippet">tool.execute() fs · ripgrep · git spawn</p>
-            <p className="ih-pcard-gate-state">GATE STATE: ALLOWED</p>
-          </div>
-        </div>
-        <p className="ih-preview-caption">
-          Focused crop of the architecture graph — the full interactive map lives in the playground.
-        </p>
       </div>
     </section>
   );
