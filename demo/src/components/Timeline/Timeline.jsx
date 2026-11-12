@@ -1,70 +1,43 @@
-// Playback timeline: turns, steps, speed, and run metadata.
-// Step ticks are plain buttons in a group (not a slider), so keyboard focus
-// and Space/arrow shortcuts keep working without conflicting semantics.
-import {
-  SegmentedControl,
-  SegmentedControlItem,
-} from "@astryxdesign/core/SegmentedControl";
-import { Text } from "@astryxdesign/core/Text";
+// Inline scrubber: turn tag plus a hairline track with fill, per-step
+// ticks (cobalt divider where turns change), and click-to-seek.
+import { useMemo } from "react";
 
-const SPEEDS = ["0.5x", "1x", "2x"];
+export default function Timeline({ pos, go, max, view }) {
+  const { turnOf, dividers } = useMemo(() => {
+    const map = {};
+    const divs = new Set();
+    let prev = null;
+    view.turns.forEach((t) => t.steps.forEach((s) => {
+      map[s.itemIndex] = t.n;
+      if (prev !== null && t.n !== prev) divs.add(s.itemIndex);
+      prev = t.n;
+    }));
+    return { turnOf: map, dividers: divs };
+  }, [view]);
 
-export default function Timeline({ pos, go, max, denyLimit, speed, setSpeed, stepInfo, view }) {
-  const done = max > 0 ? Math.round(((pos.index + 1) / (max + 1)) * 100) : 0;
+  const pct = max > 0 ? Math.round(((pos.index + 1) / (max + 1)) * 100) : 0;
+
+  const seek = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    go(Math.round(ratio * max));
+  };
+
+  const ticks = [];
+  for (let k = 0; k <= max; k++) ticks.push(k);
 
   return (
-    <div className="nimi-timeline">
-      <div className="nimi-timeline-track" role="group" aria-label="Execution timeline">
-        {view.turns.map((turn) => (
-          <div key={turn.n} className="nimi-timeline-turn">
-            <span className="nimi-timeline-turn-label">Turn {turn.n}</span>
-            <div className="nimi-timeline-blocks">
-              {turn.steps.map((s) => {
-                const idx = s.itemIndex ?? s.key;
-                const isCurrent = idx === pos.index;
-                const isTruncated = pos.branch === "deny" && idx > denyLimit;
-                const isDenyGate = pos.branch === "deny" && idx === denyLimit;
-                let cls = "nimi-step-block";
-                if (isCurrent) cls += " current";
-                else if (idx < pos.index) cls += " past";
-                if (isTruncated) cls += " truncated";
-                if (isDenyGate) cls += " denied-gate";
-                return (
-                  <button
-                    key={`${turn.n}-${s.key}`}
-                    type="button"
-                    className={cls}
-                    onClick={() => go(idx)}
-                    title={`Step ${idx + 1} of ${max + 1}`}
-                    aria-label={`Jump to step ${idx + 1} of ${max + 1}${isDenyGate ? " (permission gate)" : ""}`}
-                    aria-current={isCurrent ? "step" : undefined}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="nimi-timeline-meta">
-        <SegmentedControl label="Playback speed" value={speed} onChange={setSpeed} size="sm">
-          {SPEEDS.map((s) => (
-            <SegmentedControlItem key={s} value={s} label={s} />
+    <div className="bp-scrub">
+      <span className="bp-turn-tag">Turn {turnOf[pos.index] ?? 1}</span>
+      <div className="bp-track" onClick={seek} role="slider" aria-label="Replay scrubber" aria-valuemin={1} aria-valuemax={max + 1} aria-valuenow={pos.index + 1} tabIndex={0} onKeyDown={(e) => { if (e.key === "ArrowRight") go(pos.index + 1); else if (e.key === "ArrowLeft") go(pos.index - 1); }}>
+        <div className="bp-track-line">
+          <div className="bp-track-fill" style={{ width: `${pct}%` }} />
+        </div>
+        <div className="bp-ticks" aria-hidden>
+          {ticks.map((k) => (
+            <span key={k} className={`bp-tick${dividers.has(k) ? " div" : ""}`} />
           ))}
-        </SegmentedControl>
-        <Text type="label" color="secondary" className="nimi-mono">
-          {stepInfo?.shortPhase ?? "finish"} · {done}%
-        </Text>
-        <Text type="code" color="secondary" className="nimi-mono">
-          {pos.index + 1}/{max + 1}
-        </Text>
-        {view?.truncated && (
-          <Text type="label" color="warning" className="nimi-mono">
-            truncated
-          </Text>
-        )}
-        <Text type="label" color="secondary" className="nimi-mono nimi-timeline-hint">
-          space play · ←/→ step
-        </Text>
+        </div>
       </div>
     </div>
   );
