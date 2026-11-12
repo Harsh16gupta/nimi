@@ -1,9 +1,10 @@
 import { createInterface } from "node:readline";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
-import { MissingApiKeyError, getProvider, getProviderMeta } from "../providers/index.ts";
+import { MissingApiKeyError, getProvider, getProviderMeta, listProviders } from "../providers/index.ts";
 import { deleteApiKey, getAuthPath, saveApiKey } from "../config/auth.ts";
-import { MODELS, getModelInfo } from "../providers/models.ts";
+import { MODELS, getModelInfo, getModelSearchText, resolveModelReference } from "../providers/models.ts";
+import { fuzzyFilter } from "../tui/fuzzy.ts";
 import { allowAll, createPromptPermission } from "../permissions.ts";
 import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import { ALL_TOOLS } from "../tools/index.ts";
@@ -74,19 +75,47 @@ export async function runClassic(opts: ClassicOptions): Promise<void> {
             }
             if (slash.type === "model") {
                 if (!slash.arg) {
-                    for (const m of MODELS) console.log(`  ${m.id}${m.id === model ? "  ← current" : ""}`);
+                    for (const m of MODELS) console.log(`  ${m.provider}/${m.id}${m.id === model ? "  ← current" : ""}`);
                 } else {
-                    const info = getModelInfo(slash.arg);
-                    if (!info) console.log(`Unknown model: ${slash.arg}`);
-                    else {
-                        try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} — history kept.`); }
+                    const info = resolveModelReference(slash.arg, provider?.name);
+                    if (!info) {
+                        console.log(`Unknown model: ${slash.arg}. Closest matches:`);
+                        for (const m of fuzzyFilter(MODELS, slash.arg, (c) => getModelSearchText(c)).slice(0, 5)) {
+                            console.log(`  ${m.provider}/${m.id}`);
+                        }
+                    } else {
+                        try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} [${info.provider}] — history kept.`); }
                         catch (e) {
                             console.log(e instanceof Error ? e.message : String(e));
                             if (e instanceof MissingApiKeyError && await ensureKey(e.provider)) {
-                                try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} — history kept.`); }
+                                try { provider = getProvider(info.provider); model = info.id; console.log(`Switched to ${model} [${info.provider}] — history kept.`); }
                                 catch (retry) { console.log(retry instanceof Error ? retry.message : String(retry)); }
                             }
                         }
+                    }
+                }
+                continue;
+            }
+            if (slash.type === "provider") {
+                if (!slash.arg) {
+                    for (const p of listProviders()) console.log(`  ${p.id}${p.id === provider?.name ? "  ← current" : ""}`);
+                    continue;
+                }
+                try {
+                    const created = getProvider(slash.arg);
+                    provider = created;
+                    const current = getModelInfo(model);
+                    model = current?.provider === slash.arg ? model : created.defaultModel;
+                    console.log(`Switched to ${slash.arg}/${model} — history kept.`);
+                } catch (e) {
+                    console.log(e instanceof Error ? e.message : String(e));
+                    if (e instanceof MissingApiKeyError && await ensureKey(e.provider)) {
+                        try {
+                            provider = getProvider(slash.arg);
+                            const current = getModelInfo(model);
+                            model = current?.provider === slash.arg ? model : provider.defaultModel;
+                            console.log(`Switched to ${slash.arg}/${model} — history kept.`);
+                        } catch (retry) { console.log(retry instanceof Error ? retry.message : String(retry)); }
                     }
                 }
                 continue;

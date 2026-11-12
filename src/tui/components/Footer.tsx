@@ -1,4 +1,5 @@
 import { Box, Text } from "ink";
+import { getProviderDefaultModel } from "../../providers/index.ts";
 import { contractHome, formatTokens, termWidth, truncateToWidth } from "./util.ts";
 
 // Pinned bottom statusline, two lines like pi's footer:
@@ -32,7 +33,12 @@ export function Footer({
     ? `~${formatTokens(used)}/${formatTokens(limit)} (${pct}% auto)`
     : `~${formatTokens(used)} tokens`;
   const ctxColor: "green" | "yellow" | "red" = pct === null ? "green" : pct > 90 ? "red" : pct > 70 ? "yellow" : "green";
-  const right = providerName ? `${providerName}/${model}` : model;
+  let right = providerName ? `${providerName}/${model}` : model;
+  try {
+    if (providerName && getProviderDefaultModel(providerName) === model) right += " · default";
+  } catch {
+    // Unknown provider — show the raw pair without a marker.
+  }
 
   // Right-align provider/model; truncate either side with … when narrow.
   const MIN_GAP = 2;

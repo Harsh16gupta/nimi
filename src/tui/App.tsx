@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Static, Text, useApp, useInput } from "ink";
 import { runAgent } from "../agent.ts";
 import { compactMessages, estimateTokens, getContextLimit } from "../agent/compaction.ts";
-import { MODELS, getModelInfo } from "../providers/models.ts";
+import { MODELS, getModelInfo, getModelsByProvider, resolveModelReference, type ModelInfo } from "../providers/models.ts";
 import { MissingApiKeyError, getProvider, getProviderMeta, listProviders } from "../providers/index.ts";
 import { deleteApiKey, getAuthPath, saveApiKey } from "../config/auth.ts";
 import { CONTEXT_FILES } from "../config/system-prompt.ts";
@@ -12,10 +12,12 @@ import { appendMessages, listSessions, loadSession } from "../session/store.ts";
 import type { Message, Provider, Tool } from "../types.ts";
 import { resultSummary, shortLabel } from "./format.ts";
 import { HELP_TEXT, parseBare, parseSlash } from "./slash.ts";
-import { AuthKeyPrompt, AuthProviderPicker, type AuthFlow } from "./components/AuthDialog.tsx";
+import { AuthKeyPrompt, AuthProviderPicker, filterProviders, type AuthFlow } from "./components/AuthDialog.tsx";
 import { Composer, ErrorLine, PermissionDialog } from "./components/Composer.tsx";
 import { Footer } from "./components/Footer.tsx";
 import { StartupHeader } from "./components/Header.tsx";
+import { ModelSelector, filterModelItems, sortModelItems, type ModelScope } from "./components/ModelSelector.tsx";
+import { applySlashCompletion, deriveSlashPopup, SlashPopup } from "./components/SlashPopup.tsx";
 import { renderRow, type Row } from "./components/ToolRow.tsx";
 import { getGitBranch } from "./components/util.ts";
 
@@ -52,6 +54,11 @@ export default function App({ provider, model, version, system, tools, initialPr
   const [authFlow, setAuthFlow] = useState<AuthFlow | null>(null);
   const [keyDraft, setKeyDraft] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
+  // Interactive model picker (pi's /model selector): fuzzy search + scope.
+  const [modelFlow, setModelFlow] = useState<{ search: string; selected: number; scope: ModelScope } | null>(null);
+  // Slash-command autocomplete popup: index into the derived items.
+  const [popupSelected, setPopupSelected] = useState(0);
+  const [popupOff, setPopupOff] = useState(false);
 
   // Startup chrome: project context files actually present in the cwd,
   // and the git branch (read once — branches rarely change mid-chat).
@@ -81,6 +88,10 @@ export default function App({ provider, model, version, system, tools, initialPr
   // /model can switch these mid-session; history is kept.
   const [activeProvider, setActiveProvider] = useState(provider);
   const [activeModel, setActiveModel] = useState(model);
+  // Composer history: every submitted line (↑↓ to recall, like pi's editor).
+  const historyRef = useRef<string[]>([]);
+  const histIdxRef = useRef<number | null>(null);
+  const histTmpRef = useRef("");
 
   const nextId = useCallback(() => idRef.current++, []);
 
@@ -148,7 +159,7 @@ export default function App({ provider, model, version, system, tools, initialPr
 
   const openProviderPicker = useCallback((mode: "login" | "logout") => {
     setAuthError(null);
-    setAuthFlow({ step: "provider", mode, selected: 0 });
+    setAuthFlow({ step: "provider", mode, selected: 0, filter: "" });
   }, []);
 
   // Persist the key (mode 0600, like pi's auth.json), then activate the provider.
@@ -207,7 +218,7 @@ export default function App({ provider, model, version, system, tools, initialPr
       // to the picker so the next message can't fail with a key error.
       if (activeProvider?.name === providerId && !stillConfigured) {
         setActiveProvider(null);
-        setAuthFlow({ step: "provider", mode: "login", selected: 0 });
+        setAuthFlow({ step: "provider", mode: "login", selected: 0, filter: "" });
       }
       setRows((prev) => [
         ...prev,
@@ -219,11 +230,99 @@ export default function App({ provider, model, version, system, tools, initialPr
     [activeProvider, nextId],
   );
 
+  // --- Model switching (pi's /model + Ctrl+P + picker) ---
+
+  const switchToModel = useCallback(
+    (info: ModelInfo, echoCommand: string | null) => {
+      const id = nextId();
+      try {
+        setActiveProvider(getProvider(info.provider));
+        setActiveModel(info.id);
+        setModelFlow(null);
+        const rows2: Row[] = echoCommand
+          ? [
+              { kind: "user", id, text: echoCommand },
+              { kind: "text", id: id + 1, text: `Switched to ${info.id} [${info.provider}] — history kept.` },
+            ]
+          : [{ kind: "text", id, text: `Switched to ${info.id} [${info.provider}] — history kept.` }];
+        setRows((prev) => [...prev, ...rows2]);
+      } catch (e) {
+        // Missing key: close the picker and route into the login flow
+        // like pi instead of leaving a bare error row.
+        setModelFlow(null);
+        if (echoCommand) {
+          setRows((prev) => [...prev, { kind: "user", id, text: echoCommand }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
+        } else {
+          setRows((prev) => [...prev, { kind: "text", id, text: e instanceof Error ? e.message : String(e) }]);
+        }
+        if (e instanceof MissingApiKeyError) openKeyPrompt(e.provider);
+      }
+      idRef.current++;
+    },
+    [nextId, openKeyPrompt],
+  );
+
+  const openModelSelector = useCallback(
+    (initialSearch = "") => {
+      setModelFlow({ search: initialSearch, selected: 0, scope: activeProvider ? "scoped" : "all" });
+    },
+    [activeProvider],
+  );
+
+  // Cycle within the current provider's models (pi's Ctrl+P).
+  const cycleModel = useCallback(
+    (dir: 1 | -1) => {
+      if (!activeProvider) {
+        const id = nextId();
+        setRows((prev) => [...prev, { kind: "text", id, text: "Not logged in. Run /login to add an API key first." }]);
+        idRef.current++;
+        openProviderPicker("login");
+        return;
+      }
+      const list = getModelsByProvider(activeProvider.name);
+      if (list.length < 2) {
+        const id = nextId();
+        setRows((prev) => [...prev, { kind: "text", id, text: `Only one ${activeProvider.name} model known — use /model to see all providers.` }]);
+        idRef.current++;
+        return;
+      }
+      const idx = list.findIndex((m) => m.id === activeModel);
+      const next = list[((idx < 0 ? (dir === 1 ? -1 : 0) : idx) + dir + list.length) % list.length]!;
+      switchToModel(next, null);
+    },
+    [activeProvider, activeModel, nextId, openProviderPicker, switchToModel],
+  );
+
+  const switchToProvider = useCallback(
+    (providerId: string, echoCommand: string) => {
+      const id = nextId();
+      try {
+        const created = getProvider(providerId);
+        setActiveProvider(created);
+        const current = getModelInfo(activeModel);
+        const nextModel = current?.provider === providerId ? activeModel : created.defaultModel;
+        setActiveModel(nextModel);
+        setRows((prev) => [...prev, { kind: "user", id, text: echoCommand }, { kind: "text", id: id + 1, text: `Switched to ${providerId}/${nextModel} — history kept.` }]);
+      } catch (e) {
+        setRows((prev) => [...prev, { kind: "user", id, text: echoCommand }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
+        if (e instanceof MissingApiKeyError) openKeyPrompt(e.provider);
+      }
+      idRef.current++;
+    },
+    [activeModel, nextId, openKeyPrompt],
+  );
+
   const submitPrompt = useCallback(
     async (prompt: string) => {
       const text = prompt.trim();
       if (!text || workingRef.current || leaving) return;
       setError(null);
+      // History: every submitted line is recallable with ↑↓.
+      if (historyRef.current[historyRef.current.length - 1] !== text) {
+        historyRef.current.push(text);
+        if (historyRef.current.length > 100) historyRef.current.shift();
+      }
+      histIdxRef.current = null;
 
       const slash = parseSlash(text) ?? parseBare(text);
       if (slash) {
@@ -257,28 +356,26 @@ export default function App({ provider, model, version, system, tools, initialPr
           return;
         }
         if (slash.type === "model") {
+          if (!slash.arg) {
+            openModelSelector("");
+          } else {
+            // Exact id (or provider/id) switches immediately; anything
+            // else opens the picker preseeded with the search (pi behavior).
+            const info = resolveModelReference(slash.arg, activeProvider?.name);
+            if (info) switchToModel(info, text);
+            else openModelSelector(slash.arg);
+          }
+          return;
+        }
+        if (slash.type === "provider") {
           const id = nextId();
           if (!slash.arg) {
-            const lines = MODELS.map((m) => `  ${m.id}${m.id === activeModel ? "  ← current" : ""}`);
-            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Models (use /model <id>):\n" + lines.join("\n") }]);
+            const lines = listProviders().map((p) => `  ${p.id}${p.id === activeProvider?.name ? "  ← current" : ""}`);
+            setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: "Providers (use /provider <id>):\n" + lines.join("\n") }]);
+            idRef.current++;
           } else {
-            const info = getModelInfo(slash.arg);
-            if (!info) {
-              setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Unknown model: ${slash.arg}  (try /model)` }]);
-            } else {
-              try {
-                setActiveProvider(getProvider(info.provider));
-                setActiveModel(info.id);
-                setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: `Switched to ${info.id} — history kept.` }]);
-              } catch (e) {
-                // Missing key: route into the login flow like pi instead of
-                // leaving a bare error row.
-                setRows((prev) => [...prev, { kind: "user", id, text }, { kind: "text", id: id + 1, text: e instanceof Error ? e.message : String(e) }]);
-                if (e instanceof MissingApiKeyError) openKeyPrompt(e.provider);
-              }
-            }
+            switchToProvider(slash.arg, text);
           }
-          idRef.current++;
           return;
         }
         if (slash.type === "tools") {
@@ -447,8 +544,43 @@ export default function App({ provider, model, version, system, tools, initialPr
         }
       }
     },
-    [appendText, canUseTool, contextLimit, leaving, activeModel, activeProvider, authFlow, nextId, openKeyPrompt, openProviderPicker, quit, runLogout, sessionId, system, tools],
+    [appendText, canUseTool, contextLimit, leaving, activeModel, activeProvider, authFlow, nextId, openKeyPrompt, openModelSelector, openProviderPicker, quit, runLogout, switchToModel, switchToProvider, sessionId, system, tools],
   );
+
+  // Derived UI state (recomputed every render for the key handler below).
+  const authProviders = authFlow?.step === "provider" ? filterProviders(authFlow.filter) : [];
+  const modelItems = modelFlow
+    ? sortModelItems(
+        filterModelItems(modelFlow.search, modelFlow.scope, activeProvider?.name ?? null),
+        activeProvider ? { provider: activeProvider.name, id: activeModel } : null,
+      )
+    : [];
+  const popup =
+    !modelFlow && !authFlow && !pending && !popupOff ? deriveSlashPopup(draft, popupSelected) : null;
+  const popupCount = popup?.items.length ?? 0;
+  const popupIdx = popupCount > 0 ? popup!.selected % popupCount : 0;
+
+  // Pick the highlighted provider in the auth picker.
+  const pickAuthProvider = useCallback(() => {
+    if (authFlow?.step !== "provider") return;
+    const list = filterProviders(authFlow.filter);
+    if (list.length === 0) return;
+    const picked = list[authFlow.selected % list.length]!;
+    if (authFlow.mode === "login") {
+      setKeyDraft("");
+      setAuthError(null);
+      setAuthFlow({ step: "key", providerId: picked.id, envVar: picked.envVar });
+    } else {
+      void runLogout(picked.id, `/logout ${picked.id}`);
+    }
+  }, [authFlow, runLogout]);
+
+  // Confirm the highlighted model in the picker (also wired to its TextInput).
+  const pickModelItem = useCallback(() => {
+    if (!modelFlow || modelItems.length === 0) return;
+    const picked = modelItems[modelFlow.selected % modelItems.length]!;
+    switchToModel(picked, null);
+  }, [modelFlow, modelItems, switchToModel]);
 
   useInput((input, key) => {
     // Ctrl+C exits cleanly when idle; interrupts the agent when working.
@@ -464,27 +596,61 @@ export default function App({ provider, model, version, system, tools, initialPr
       }
       return;
     }
-    // Auth picker owns the keyboard while it is up (pi: selector replaces editor).
-    if (authFlow?.step === "provider") {
-      const options = listProviders();
+    // Model picker owns the keyboard while it is up (enter is handled by
+    // its search TextInput's onSubmit → pickModelItem, so it is skipped here).
+    if (modelFlow) {
       if (key.upArrow) {
-        setAuthFlow((prev) => (prev?.step === "provider" ? { ...prev, selected: (prev.selected + options.length - 1) % options.length } : prev));
+        if (modelItems.length > 0) {
+          setModelFlow((prev) =>
+            prev ? { ...prev, selected: (prev.selected + modelItems.length - 1) % modelItems.length } : prev,
+          );
+        }
         return;
       }
       if (key.downArrow) {
-        setAuthFlow((prev) => (prev?.step === "provider" ? { ...prev, selected: (prev.selected + 1) % options.length } : prev));
+        if (modelItems.length > 0) {
+          setModelFlow((prev) => (prev ? { ...prev, selected: (prev.selected + 1) % modelItems.length } : prev));
+        }
         return;
       }
-      if (key.return) {
-        const current = authFlow;
-        const picked = options[current.selected];
-        if (!picked) return;
-        if (current.mode === "login") {
-          setKeyDraft("");
-          setAuthError(null);
-          setAuthFlow({ step: "key", providerId: picked.id, envVar: picked.envVar });
-        } else {
-          void runLogout(picked.id, `/logout ${picked.id}`);
+      if (key.pageUp || key.pageDown) {
+        if (modelItems.length > 0) {
+          const delta = key.pageUp ? -10 : 10;
+          setModelFlow((prev) =>
+            prev
+              ? { ...prev, selected: (prev.selected + delta + modelItems.length * 10) % modelItems.length }
+              : prev,
+          );
+        }
+        return;
+      }
+      if (key.tab) {
+        setModelFlow((prev) => (prev ? { ...prev, scope: prev.scope === "scoped" ? "all" : "scoped", selected: 0 } : prev));
+        return;
+      }
+      if (key.escape) {
+        setModelFlow(null);
+      }
+      return;
+    }
+    // Auth picker owns the keyboard while it is up (enter is handled by
+    // its filter TextInput's onSubmit → pickAuthProvider, skipped here).
+    if (authFlow?.step === "provider") {
+      if (key.upArrow) {
+        if (authProviders.length > 0) {
+          setAuthFlow((prev) =>
+            prev?.step === "provider"
+              ? { ...prev, selected: (prev.selected + authProviders.length - 1) % authProviders.length }
+              : prev,
+          );
+        }
+        return;
+      }
+      if (key.downArrow) {
+        if (authProviders.length > 0) {
+          setAuthFlow((prev) =>
+            prev?.step === "provider" ? { ...prev, selected: (prev.selected + 1) % authProviders.length } : prev,
+          );
         }
         return;
       }
@@ -498,7 +664,7 @@ export default function App({ provider, model, version, system, tools, initialPr
     }
     // Key prompt: TextInput owns typing; esc steps back to the picker.
     if (authFlow?.step === "key" && key.escape) {
-      setAuthFlow({ step: "provider", mode: "login", selected: 0 });
+      setAuthFlow({ step: "provider", mode: "login", selected: 0, filter: "" });
       setAuthError(null);
       setKeyDraft("");
       return;
@@ -511,6 +677,69 @@ export default function App({ provider, model, version, system, tools, initialPr
       else if (ch === "n" || key.escape) pending.resolve("no");
       return;
     }
+    // Slash autocomplete popup: tab completes, ↑↓ navigate, esc dismisses.
+    // Enter always sends (TextInput's onSubmit) — no double handling here.
+    if (popup && popupCount > 0) {
+      if (key.tab) {
+        const completion = popup.items[popupIdx]!;
+        setDraft(applySlashCompletion(draft, completion));
+        setPopupSelected(0);
+        return;
+      }
+      if (key.upArrow) {
+        setPopupSelected((s) => (s + popupCount - 1) % popupCount);
+        return;
+      }
+      if (key.downArrow) {
+        setPopupSelected((s) => (s + 1) % popupCount);
+        return;
+      }
+      if (key.escape) {
+        setPopupOff(true);
+        return;
+      }
+    }
+    // Composer history (only when no popup/menu is open).
+    if (!popup && (key.upArrow || key.downArrow)) {
+      const list = historyRef.current;
+      if (list.length > 0) {
+        if (key.upArrow) {
+          if (histIdxRef.current === null) {
+            histTmpRef.current = draft;
+            histIdxRef.current = list.length - 1;
+            setDraft(list[list.length - 1]!);
+          } else if (histIdxRef.current > 0) {
+            histIdxRef.current -= 1;
+            setDraft(list[histIdxRef.current]!);
+          }
+        } else {
+          if (histIdxRef.current !== null) {
+            if (histIdxRef.current >= list.length - 1) {
+              histIdxRef.current = null;
+              setDraft(histTmpRef.current);
+            } else {
+              histIdxRef.current += 1;
+              setDraft(list[histIdxRef.current]!);
+            }
+          }
+        }
+        return;
+      }
+    }
+    // Ctrl+P cycles same-provider models, Ctrl+L opens the picker
+    // (pi's app.model.cycleForward / app.model.select).
+    if (key.ctrl && (input === "p" || input === "P")) {
+      cycleModel(key.shift ? -1 : 1);
+      return;
+    }
+    if (key.ctrl && input === "n") {
+      cycleModel(-1);
+      return;
+    }
+    if (key.ctrl && input === "l") {
+      if (!authFlow && !pending) openModelSelector("");
+      return;
+    }
     if (key.escape && workingRef.current) {
       abortRef.current?.abort();
     }
@@ -521,6 +750,17 @@ export default function App({ provider, model, version, system, tools, initialPr
   useEffect(() => {
     if (pending) setDraft("");
   }, [pending]);
+
+  // A new draft re-arms the autocomplete popup (ref-guarded so that
+  // popup navigation itself never resets the selection).
+  const prevDraftRef = useRef(draft);
+  useEffect(() => {
+    if (prevDraftRef.current !== draft) {
+      prevDraftRef.current = draft;
+      setPopupOff(false);
+      setPopupSelected(0);
+    }
+  });
 
   useEffect(() => {
     // Startup without a key (or a logged-out switch): open the key prompt
@@ -563,8 +803,28 @@ export default function App({ provider, model, version, system, tools, initialPr
         }
       </Static>
       {live && renderRow(live)}
+      {modelFlow && (
+        <ModelSelector
+          search={modelFlow.search}
+          onSearchChange={(v) => setModelFlow((prev) => (prev ? { ...prev, search: v, selected: 0 } : prev))}
+          onSearchSubmit={pickModelItem}
+          items={modelItems}
+          selected={modelItems.length > 0 ? modelFlow.selected % modelItems.length : 0}
+          current={activeProvider ? { provider: activeProvider.name, id: activeModel } : null}
+          scope={modelFlow.scope}
+          scopedCount={activeProvider ? getModelsByProvider(activeProvider.name).length : MODELS.length}
+          totalCount={MODELS.length}
+        />
+      )}
       {authFlow?.step === "provider" && (
-        <AuthProviderPicker mode={authFlow.mode} selected={authFlow.selected} canCancel={activeProvider !== null} />
+        <AuthProviderPicker
+          mode={authFlow.mode}
+          selected={authProviders.length > 0 ? authFlow.selected % authProviders.length : 0}
+          filter={authFlow.filter}
+          onFilterChange={(v) => setAuthFlow((prev) => (prev?.step === "provider" ? { ...prev, filter: v, selected: 0 } : prev))}
+          onFilterSubmit={pickAuthProvider}
+          canCancel={activeProvider !== null}
+        />
       )}
       {authFlow?.step === "key" && (
         <AuthKeyPrompt
@@ -580,7 +840,8 @@ export default function App({ provider, model, version, system, tools, initialPr
       )}
       {pending && <PermissionDialog name={pending.name} input={pending.input} />}
       {error && <ErrorLine message={error} />}
-      {!authFlow && !pending && (
+      {popup && <SlashPopup popup={{ ...popup, selected: popupIdx }} />}
+      {!authFlow && !pending && !modelFlow && (
         <Composer
           draft={draft}
           onChange={setDraft}

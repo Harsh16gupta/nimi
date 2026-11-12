@@ -34,7 +34,7 @@ export function StartupHeader({
       <Text key="m2">{frame(m2, inner)}</Text>
       <Text key="m3">{frame(m3, inner)}</Text>
       <Text dimColor>{frame(truncateToWidth(status, inner), inner)}</Text>
-      <Text dimColor>{frame(truncateToWidth("enter send · esc interrupt · /login /model /help", inner), inner)}</Text>
+      <Text dimColor>{frame(truncateToWidth("enter send · tab complete · ctrl+l models · esc stop", inner), inner)}</Text>
       <Text dimColor>{bottom}</Text>
     </Box>
   );
