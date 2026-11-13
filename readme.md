@@ -45,7 +45,8 @@ That's it — Nimi opens an interactive session in your terminal. Give it a task
 ```
 -p, --prompt <text>       prompt to send
 -z, --provider <id>       anthropic, anthropic-openai, groq, meta (default),
-                          deepseek, openai, xai, kimi, google
+                          deepseek, openai, xai, kimi, google, alibaba, zai,
+                          custom (see below)
     --model <id>          override the provider's default model
     --session <id>        resume a session (--list-sessions to list)
     --context-limit <n>   override context window
@@ -77,8 +78,25 @@ Nimi is provider-agnostic over OpenAI-compatible APIs. The default provider is `
 | `xai` | `XAI_API_KEY` | `grok-4` |
 | `kimi` | `MOONSHOT_API_KEY` | `kimi-k2` |
 | `google` | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+| `alibaba` | `DASHSCOPE_API_KEY` | `qwen3.8-max` |
+| `zai` | `ZAI_API_KEY` | `glm-5.3` |
+| `custom` | `NIMI_API_KEY` | (none — you supply it, see below) |
+
+Century-scale context is the norm here: most models above offer 1M tokens. `--model` accepts any model id string, even one not listed above — the catalog only feeds the `/model` picker and the auto-compaction threshold (unknown models skip auto-compaction unless you pass `--context-limit`).
 
 Override the model per run with `--model <id>`, per environment with `NIMI_MODEL`, or switch mid-session with `/model`. First run opens `/login` in the TUI (keys saved to `~/.nimi/auth.json`); headless/CI can export the key instead.
+
+### Custom provider
+
+Any OpenAI-compatible endpoint works without code changes — Ollama, vLLM, Together, or anything else not listed above:
+
+```bash
+export NIMI_BASE_URL=https://your-host/v1
+export NIMI_API_KEY=...        # or run /login custom once
+nimi -z custom --model <model-id> "your task"
+```
+
+`NIMI_MODEL` can supply the default model instead of `--model`. In the TUI, `/model <id>` accepts any id while on the custom provider.
 
 ## Config & sessions
 
