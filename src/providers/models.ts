@@ -5,7 +5,8 @@
 //
 // Sources (checked Nov 2026): Anthropic model overview (platform.claude.com),
 // OpenAI model catalog (platform.openai.com), Groq supported models
-// (console.groq.com/docs/models), DeepSeek pricing (api-docs.deepseek.com).
+// (console.groq.com/docs/models), DeepSeek pricing (api-docs.deepseek.com),
+// xAI model catalog (docs.x.ai), Moonshot platform (platform.moonshot.ai).
 // Legacy entries are kept so old sessions and configs keep resolving.
 
 export type ModelInfo = { id: string; provider: string; contextWindow: number };
@@ -63,6 +64,15 @@ export const MODELS: ModelInfo[] = [
     { id: "gpt-5-mini", provider: "openai", contextWindow: 400000 },
     { id: "gpt-4o", provider: "openai", contextWindow: 128000 },
     { id: "o3-mini", provider: "openai", contextWindow: 200000 },
+    // xAI (Grok, OpenAI-compatible). Grok 4 line is 256K context.
+    { id: "grok-4", provider: "xai", contextWindow: 256000 },
+    { id: "grok-4-1-fast", provider: "xai", contextWindow: 2000000 },
+    { id: "grok-3", provider: "xai", contextWindow: 131072 },
+    // Kimi (Moonshot, OpenAI-compatible). K2 line is 256K context;
+    // moonshot-v1 kept for old sessions.
+    { id: "kimi-k2", provider: "kimi", contextWindow: 256000 },
+    { id: "kimi-k2-thinking", provider: "kimi", contextWindow: 256000 },
+    { id: "moonshot-v1-128k", provider: "kimi", contextWindow: 128000 },
 ];
 
 // Plain loop so the lookup is visible; returns undefined when unknown.

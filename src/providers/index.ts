@@ -20,6 +20,8 @@ export const PROVIDER_DEFS: Record<string, ProviderMeta> = {
     meta: { id: "meta", label: "Meta", envVar: "META_API_KEY", defaultModel: "muse-spark-1.3-contributor", baseURL: "https://api.meta.ai/v1", kind: "openai-compat" },
     deepseek: { id: "deepseek", label: "DeepSeek", envVar: "DEEPSEEK_API_KEY", defaultModel: "deepseek-flash", baseURL: "https://api.deepseek.com", kind: "openai-compat" },
     openai: { id: "openai", label: "OpenAI", envVar: "OPENAI_API_KEY", defaultModel: "gpt-4o-mini", baseURL: "https://api.openai.com/v1", kind: "openai-compat" },
+    xai: { id: "xai", label: "xAI (Grok)", envVar: "XAI_API_KEY", defaultModel: "grok-4", baseURL: "https://api.x.ai/v1", kind: "openai-compat" },
+    kimi: { id: "kimi", label: "Kimi (Moonshot)", envVar: "MOONSHOT_API_KEY", defaultModel: "kimi-k2", baseURL: "https://api.moonshot.ai/v1", kind: "openai-compat" },
 };
 
 // Thrown when a provider is known but has no key in auth.json or env.
