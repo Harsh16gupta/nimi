@@ -83,6 +83,12 @@ try {
     process.exit(1);
   }
 }
+// The custom provider has no built-in default: a model must come from
+// --model, settings, or NIMI_MODEL (empty string when none did).
+if (!model) {
+  console.error('No model configured for the custom provider. Pass --model <id> or set NIMI_MODEL.');
+  process.exit(1);
+}
 const system = await buildSystemPrompt(settings.systemPromptExtra);
 
 // Piped / non-interactive: keep the old one-shot behavior so scripts

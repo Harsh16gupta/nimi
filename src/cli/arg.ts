@@ -135,9 +135,12 @@ OPTIONS
   -h, --help             Show this help
 
 PROVIDERS
-  anthropic, anthropic-openai, groq, meta, deepseek, openai, xai, kimi, googleAUTH
+  anthropic, anthropic-openai, groq, meta, deepseek, openai, xai, kimi, google,
+  alibaba, zai, custom (any OpenAI-compatible endpoint via NIMI_BASE_URL)AUTH
   First run opens /login in the TUI (keys saved to ~/.nimi/auth.json).
   Headless/CI: export the provider's key instead (e.g. META_API_KEY).
+  Custom endpoint: NIMI_BASE_URL=<openai-compatible base url>
+    NIMI_API_KEY=<key> NIMI_MODEL=<model> (or pass --model)
 
 EXAMPLES
   nimi -p "explain this codebase"

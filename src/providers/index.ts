@@ -23,6 +23,8 @@ export const PROVIDER_DEFS: Record<string, ProviderMeta> = {
     xai: { id: "xai", label: "xAI (Grok)", envVar: "XAI_API_KEY", defaultModel: "grok-4", baseURL: "https://api.x.ai/v1", kind: "openai-compat" },
     kimi: { id: "kimi", label: "Kimi (Moonshot)", envVar: "MOONSHOT_API_KEY", defaultModel: "kimi-k2", baseURL: "https://api.moonshot.ai/v1", kind: "openai-compat" },
     google: { id: "google", label: "Google (Gemini)", envVar: "GOOGLE_API_KEY", defaultModel: "gemini-2.5-flash", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/", kind: "openai-compat" },
+    alibaba: { id: "alibaba", label: "Alibaba (Qwen)", envVar: "DASHSCOPE_API_KEY", defaultModel: "qwen3.8-max", baseURL: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", kind: "openai-compat" },
+    zai: { id: "zai", label: "Z AI (GLM)", envVar: "ZAI_API_KEY", defaultModel: "glm-5.3", baseURL: "https://api.z.ai/api/coding/paas/v4", kind: "openai-compat" },
 };
 
 // Thrown when a provider is known but has no key in auth.json or env.
@@ -39,13 +41,30 @@ export class MissingApiKeyError extends Error {
 }
 
 export function listProviders(): ProviderMeta[] {
-    return Object.values(PROVIDER_DEFS);
+    return [...Object.values(PROVIDER_DEFS), customMeta()];
+}
+
+// The escape hatch for everything not hardcoded: any OpenAI-compatible
+// endpoint via env. Endpoint and default model resolve lazily so merely
+// listing providers (pickers, /login, --help) never throws — only
+// getProvider() demands a configured endpoint, and its callers already
+// render that error (TUI row / auth dialog / CLI message).
+export function customMeta(): ProviderMeta {
+    return {
+        id: "custom",
+        label: "Custom (OpenAI-compatible)",
+        envVar: "NIMI_API_KEY",
+        defaultModel: process.env.NIMI_MODEL || "",
+        baseURL: process.env.NIMI_BASE_URL || process.env.OPENAI_BASE_URL || "",
+        kind: "openai-compat",
+    };
 }
 
 export function getProviderMeta(name: string): ProviderMeta {
+    if (name === "custom") return customMeta();
     const meta = PROVIDER_DEFS[name];
     if (!meta) {
-        throw new Error(`Unknown provider: ${name}. Available: ${Object.keys(PROVIDER_DEFS).join(", ")}`);
+        throw new Error(`Unknown provider: ${name}. Available: ${[...Object.keys(PROVIDER_DEFS), "custom"].join(", ")}`);
     }
     return meta;
 }
@@ -57,6 +76,9 @@ export function getProviderDefaultModel(name: string): string {
 
 export function getProvider(name: string): Provider {
     const meta = getProviderMeta(name);
+    if (meta.kind === "openai-compat" && meta.id === "custom" && !meta.baseURL) {
+        throw new Error("Custom provider needs an endpoint: set NIMI_BASE_URL (or OPENAI_BASE_URL) to an OpenAI-compatible base URL.");
+    }
     const key = resolveKeySync(meta.id, meta.envVar);
     if (!key) throw new MissingApiKeyError(meta.id, meta.envVar);
     // The Anthropic SDK reads process.env itself, so expose a stored key

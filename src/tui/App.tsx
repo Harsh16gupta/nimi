@@ -361,9 +361,13 @@ export default function App({ provider, model, version, system, tools, initialPr
           } else {
             // Exact id (or provider/id) switches immediately; anything
             // else opens the picker preseeded with the search (pi behavior).
+            // Exception: on the custom provider any string is a valid model
+            // id (unknown endpoints serve unknown ids), so accept it as-is.
             const info = resolveModelReference(slash.arg, activeProvider?.name);
             if (info) switchToModel(info, text);
-            else openModelSelector(slash.arg);
+            else if (activeProvider?.name === "custom" && slash.arg) {
+              switchToModel({ id: slash.arg, provider: "custom", contextWindow: 0 }, text);
+            } else openModelSelector(slash.arg);
           }
           return;
         }

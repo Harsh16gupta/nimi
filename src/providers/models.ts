@@ -44,9 +44,11 @@ export const MODELS: ModelInfo[] = [
     { id: "minimaxai/minimax-m2.7", provider: "groq", contextWindow: 196608 },
     { id: "deepseek-r1-distill-llama-70b", provider: "groq", contextWindow: 128000 },
     { id: "mixtral-8x7b-32768", provider: "groq", contextWindow: 32768 },
-    // Meta.
+    // Meta. Wonder/Ember are 1M context.
     { id: "muse-spark-1.3-contributor", provider: "meta", contextWindow: 128000 },
     { id: "meta-models/muse-spark-open", provider: "meta", contextWindow: 131072 },
+    { id: "muse-wonder", provider: "meta", contextWindow: 1000000 },
+    { id: "muse-ember", provider: "meta", contextWindow: 1000000 },
     { id: "llama-4-maverick", provider: "meta", contextWindow: 128000 },
     { id: "llama-4-scout", provider: "meta", contextWindow: 128000 },
     // DeepSeek. Flash and V4 Pro are 1M context (DeepSeek-V4.1-Flash-1017 /
@@ -55,6 +57,7 @@ export const MODELS: ModelInfo[] = [
     { id: "deepseek-v4-pro", provider: "deepseek", contextWindow: 1000000 },
     { id: "deepseek-chat", provider: "deepseek", contextWindow: 128000 },
     { id: "deepseek-reasoner", provider: "deepseek", contextWindow: 128000 },
+    { id: "deepseek-v4.1-flash", provider: "deepseek", contextWindow: 1000000 },
     // OpenAI. GPT-6 line is 1.05M context; GPT-5 line is 400K.
     { id: "gpt-4o-mini", provider: "openai", contextWindow: 128000 },
     { id: "gpt-6-astra", provider: "openai", contextWindow: 1050000 },
@@ -67,17 +70,29 @@ export const MODELS: ModelInfo[] = [
     { id: "o3-mini", provider: "openai", contextWindow: 200000 },
     // xAI (Grok, OpenAI-compatible). Grok 4 line is 256K context.
     { id: "grok-4", provider: "xai", contextWindow: 256000 },
+    { id: "grok-4.7", provider: "xai", contextWindow: 500000 },
     { id: "grok-4-1-fast", provider: "xai", contextWindow: 2000000 },
     { id: "grok-3", provider: "xai", contextWindow: 131072 },
     // Kimi (Moonshot, OpenAI-compatible). K2 line is 256K context;
     // moonshot-v1 kept for old sessions.
     { id: "kimi-k2", provider: "kimi", contextWindow: 256000 },
+    { id: "kimi-k3.1-pro", provider: "kimi", contextWindow: 1000000 },
     { id: "kimi-k2-thinking", provider: "kimi", contextWindow: 256000 },
     { id: "moonshot-v1-128k", provider: "kimi", contextWindow: 128000 },
     // Google (Gemini API via OpenAI-compatible endpoint). 2.5 line is 1M context.
     { id: "gemini-2.5-flash", provider: "google", contextWindow: 1048576 },
     { id: "gemini-2.5-pro", provider: "google", contextWindow: 1048576 },
     { id: "gemini-2.0-flash", provider: "google", contextWindow: 1048576 },
+    // Gemini 3.8 / 4 line (1M context).
+    { id: "gemini-3.8-flash", provider: "google", contextWindow: 1048576 },
+    { id: "gemini-4-carbon", provider: "google", contextWindow: 1048576 },
+    { id: "gemini-4-hydrogen", provider: "google", contextWindow: 1048576 },
+    { id: "gemini-4-argon", provider: "google", contextWindow: 1048576 },
+    // Alibaba (Qwen via DashScope, OpenAI-compatible). Qwen3.8 Max is 984K.
+    { id: "qwen3.8-max", provider: "alibaba", contextWindow: 984000 },
+    { id: "qwen-max", provider: "alibaba", contextWindow: 131072 },
+    // Z AI (GLM, OpenAI-compatible). GLM-5.3 is 1M context.
+    { id: "glm-5.3", provider: "zai", contextWindow: 1000000 },
 ];
 
 // Plain loop so the lookup is visible; returns undefined when unknown.
