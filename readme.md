@@ -45,7 +45,7 @@ That's it — Nimi opens an interactive session in your terminal. Give it a task
 ```
 -p, --prompt <text>       prompt to send
 -z, --provider <id>       anthropic, anthropic-openai, groq, meta (default),
-                          deepseek, openai, xai, kimi
+                          deepseek, openai, xai, kimi, google
     --model <id>          override the provider's default model
     --session <id>        resume a session (--list-sessions to list)
     --context-limit <n>   override context window
@@ -76,6 +76,7 @@ Nimi is provider-agnostic over OpenAI-compatible APIs. The default provider is `
 | `openai` | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | `xai` | `XAI_API_KEY` | `grok-4` |
 | `kimi` | `MOONSHOT_API_KEY` | `kimi-k2` |
+| `google` | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
 
 Override the model per run with `--model <id>`, per environment with `NIMI_MODEL`, or switch mid-session with `/model`. First run opens `/login` in the TUI (keys saved to `~/.nimi/auth.json`); headless/CI can export the key instead.
 

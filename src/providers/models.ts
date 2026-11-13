@@ -6,7 +6,8 @@
 // Sources (checked Nov 2026): Anthropic model overview (platform.claude.com),
 // OpenAI model catalog (platform.openai.com), Groq supported models
 // (console.groq.com/docs/models), DeepSeek pricing (api-docs.deepseek.com),
-// xAI model catalog (docs.x.ai), Moonshot platform (platform.moonshot.ai).
+// xAI model catalog (docs.x.ai), Moonshot platform (platform.moonshot.ai),
+// Gemini API OpenAI compatibility (ai.google.dev/gemini-api/docs/openai).
 // Legacy entries are kept so old sessions and configs keep resolving.
 
 export type ModelInfo = { id: string; provider: string; contextWindow: number };
@@ -73,6 +74,10 @@ export const MODELS: ModelInfo[] = [
     { id: "kimi-k2", provider: "kimi", contextWindow: 256000 },
     { id: "kimi-k2-thinking", provider: "kimi", contextWindow: 256000 },
     { id: "moonshot-v1-128k", provider: "kimi", contextWindow: 128000 },
+    // Google (Gemini API via OpenAI-compatible endpoint). 2.5 line is 1M context.
+    { id: "gemini-2.5-flash", provider: "google", contextWindow: 1048576 },
+    { id: "gemini-2.5-pro", provider: "google", contextWindow: 1048576 },
+    { id: "gemini-2.0-flash", provider: "google", contextWindow: 1048576 },
 ];
 
 // Plain loop so the lookup is visible; returns undefined when unknown.

@@ -135,8 +135,7 @@ OPTIONS
   -h, --help             Show this help
 
 PROVIDERS
-  anthropic, anthropic-openai, groq, meta, deepseek, openai, xai, kimi
-AUTH
+  anthropic, anthropic-openai, groq, meta, deepseek, openai, xai, kimi, googleAUTH
   First run opens /login in the TUI (keys saved to ~/.nimi/auth.json).
   Headless/CI: export the provider's key instead (e.g. META_API_KEY).
 

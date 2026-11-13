@@ -22,6 +22,7 @@ export const PROVIDER_DEFS: Record<string, ProviderMeta> = {
     openai: { id: "openai", label: "OpenAI", envVar: "OPENAI_API_KEY", defaultModel: "gpt-4o-mini", baseURL: "https://api.openai.com/v1", kind: "openai-compat" },
     xai: { id: "xai", label: "xAI (Grok)", envVar: "XAI_API_KEY", defaultModel: "grok-4", baseURL: "https://api.x.ai/v1", kind: "openai-compat" },
     kimi: { id: "kimi", label: "Kimi (Moonshot)", envVar: "MOONSHOT_API_KEY", defaultModel: "kimi-k2", baseURL: "https://api.moonshot.ai/v1", kind: "openai-compat" },
+    google: { id: "google", label: "Google (Gemini)", envVar: "GOOGLE_API_KEY", defaultModel: "gemini-2.5-flash", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/", kind: "openai-compat" },
 };
 
 // Thrown when a provider is known but has no key in auth.json or env.
